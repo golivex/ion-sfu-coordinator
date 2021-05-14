@@ -11,9 +11,9 @@ services:
 
     sfu:
         image: xtechsample/ion-cluster:latest
-        build:
-            dockerfile: Dockerfile
-            context: ./ion-cluster
+        # build:
+        #     dockerfile: Dockerfile
+        #     context: ./ion-cluster
         command: ["server", "-c", "/configs/sfu.toml", "-a", ":7001"]
         volumes:
             - "./cfgs/config-docker-client.toml:/configs/sfu.toml"
@@ -26,8 +26,8 @@ services:
 
     app:
         container_name: app
-        build: 
-            context: ./client
+        # build: 
+        #     context: ./client
         image: xtechsample/client-ion
         restart: always
         environment:

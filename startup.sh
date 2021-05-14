@@ -87,7 +87,7 @@ sudo ufw enable
 
 cd /home/manish/live_ion_cluster
 
-git clone https://github.com/cryptagon/ion-cluster.git
+# git clone https://github.com/cryptagon/ion-cluster.git
 
 cat my_password.txt | docker login --username exceltech --password-stdin
 
@@ -96,5 +96,5 @@ echo $IP
 
 sed "s/{ip}/$IP/g" docker-compose-gcp.yml.sample >> docker-compose-gcp.yml
 
-sudo docker-compose -f docker-compose-gcp.yml build
+# sudo docker-compose -f docker-compose-gcp.yml build
 sudo docker-compose -f docker-compose-gcp.yml up -d 
