@@ -1,0 +1,27 @@
+{
+  "name": "live_ion_cluster",
+  "version": "1.0.0",
+  "description": "1) The idea here is that, will be using https://github.com/cryptagon/ion-cluster on google cloud instances which will auto scale via cloud instance load balancer",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/manishiitg/live_ion_cluster.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/manishiitg/live_ion_cluster/issues"
+  },
+  "homepage": "https://github.com/manishiitg/live_ion_cluster#readme",
+  "dependencies": {
+    "@godaddy/terminus": "^4.7.2",
+    "cors": "^2.8.5",
+    "etcd3": "^1.1.0",
+    "express": "^4.17.1",
+    "gcp-metadata": "^4.2.1",
+    "socket.io": "^4.1.1"
+  }
+}
