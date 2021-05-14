@@ -125,7 +125,7 @@ server.listen(PORT, async function () {
     await updateIdentify()
 
     setInterval(async () => {
-        console.log("updating health check")
+        // console.log("updating health check")
         await updateIdentify()
     }, HEALTH_INTERVAL)
 

@@ -9,8 +9,11 @@ services:
             - "./cfgs/prometheus.yml:/etc/prometheus/prometheus.yml"
 
 
-    sfuA:
+    sfu:
         image: xtechsample/ion-cluster:latest
+        build:
+            dockerfile: Dockerfile
+            context: ./ion-cluster
         command: ["server", "-c", "/configs/sfu.toml", "-a", ":7001"]
         volumes:
             - "./cfgs/config-docker-client.toml:/configs/sfu.toml"
@@ -21,8 +24,10 @@ services:
         #     - "9000-10000:9000-10000/udp"
         #     - "7000:7001"
 
-    appA:
-        container_name: appA
+    app:
+        container_name: app
+        build: 
+            context: ./client
         image: xtechsample/client-ion
         restart: always
         environment:
@@ -35,4 +40,4 @@ services:
         #     - 4001:4001
         network_mode: host
         depends_on:
-            - sfuA
+            - sfu
