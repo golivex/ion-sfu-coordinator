@@ -86,6 +86,7 @@ sudo ufw allow 9000:10000/udp
 
 cd /home/manish/live_ion_cluster
 
+cat my_password.txt | docker login --username exceltech --password-stdin
 
 IP=$(curl -H "Metadata-Flavor: Google" http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip)
 echo $IP

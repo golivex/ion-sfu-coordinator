@@ -35,5 +35,4 @@ services:
         #     - 4001:4001
         network_mode: host
         depends_on:
-            - server
             - sfuA
