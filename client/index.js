@@ -4,8 +4,6 @@ const cors = require('cors')
 const { createTerminus } = require('@godaddy/terminus');
 const app = express()
 const osu = require('node-os-utils')
-const gcpMetadata = require('gcp-metadata');
-const axios = require('axios');
 const { Etcd3 } = require('etcd3');
 const client = new Etcd3({
     "hosts" : process.env.ETCD
@@ -43,7 +41,6 @@ let gcp_ip = {}
 const ip = process.env.IP || os.ip()
 
 console.log("ip", ip)
-console.log("gcp_id", gcp_ip)
 
 function healthCheck() {
 
@@ -100,11 +97,7 @@ const getKey = () => {
 }
 
 const getIP = () => {
-    if (gcp_ip.ip) {
-        return gcp_ip.ip
-    } else {
-        return ip
-    }
+    return ip
 }
 
 const getIdentifyData = () => {
@@ -129,11 +122,6 @@ const updateShutdown = async () => {
 server.listen(PORT, async function () {
     // server ready to accept connections here
     console.log("client has started", PORT)
-    const isAvailable = await gcpMetadata.isAvailable();
-    if (isAvailable) {
-        instanceMetadata = await gcpMetadata.instance();
-        gcp_ip = await gcpMetadata.instance("network-interfaces/0/access-configs/0/external-ip")
-    }
     await updateIdentify()
 
     setInterval(async () => {
