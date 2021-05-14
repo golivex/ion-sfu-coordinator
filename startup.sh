@@ -11,7 +11,7 @@ sudo apt install apt-transport-https ca-certificates curl software-properties-co
 sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
 sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable" -y
 sudo apt update
-sudo apt-get install curl git docker-ce -y
+sudo apt-get install curl git docker-ce -y ufw
 sudo docker --version
 
 sudo curl -L "https://github.com/docker/compose/releases/download/1.27.4/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
@@ -78,12 +78,18 @@ cd /home/manish
 
 GIT_SSH_COMMAND='ssh -i /home/manish/id_rsa -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no' git clone git@github.com:manishiitg/live_ion_cluster.git
 
+sudo ufw allow 22
+sudo ufw allow 80
+
 sudo ufw allow 7001
 sudo ufw allow 9000:10000/udp
 
 cd /home/manish/live_ion_cluster
 
-cp .env.main .env
-sudo docker container ls 
-sudo docker-compose -f docker-compose-jvb.yml up -d
-sudo docker-compose -f docker-compose-jvb.yml up -d
+
+IP=$(curl -H "Metadata-Flavor: Google" http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip)
+echo $IP
+
+sed "s/{ip}/$IP/g" docker-compose-gcp.yml.sample >> docker-compose-gcp.yml
+
+sudo docker-compose -f docker-compose-gcp.yml up -d 
