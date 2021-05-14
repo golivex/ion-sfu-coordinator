@@ -1,0 +1,39 @@
+version: "3.7"
+
+services:
+
+    prometheus:
+        image: prom/prometheus:latest
+        network_mode: host
+        volumes:
+            - "./cfgs/prometheus.yml:/etc/prometheus/prometheus.yml"
+
+
+    sfuA:
+        image: xtechsample/ion-cluster:latest
+        command: ["server", "-c", "/configs/sfu.toml", "-a", ":7001"]
+        volumes:
+            - "./cfgs/config-docker-client.toml:/configs/sfu.toml"
+        environment:
+            ION_SIGNAL_FQDN: {ip}:7001
+        network_mode: host
+        # ports:
+        #     - "9000-10000:9000-10000/udp"
+        #     - "7000:7001"
+
+    appA:
+        container_name: appA
+        image: xtechsample/client-ion
+        restart: always
+        environment:
+            - PORT=4001
+            - ETCD=http://5.9.18.28:2379
+            - HEALTH_INTERVAL=10000
+            - IP={ip}
+            - SFU_PORT=7001
+        # ports:
+        #     - 4001:4001
+        network_mode: host
+        depends_on:
+            - server
+            - sfuA
