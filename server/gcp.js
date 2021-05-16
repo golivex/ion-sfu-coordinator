@@ -13,33 +13,52 @@ const runCommand = (cmd) => {
             }
             if (stderr) {
                 console.log(`stderr: ${stderr}`);
-                try {
-                    resolve(JSON.parse(stderr))
-                } catch (error) {
-                    throw error
-                }
+                // resolve(stderr)
                 return;
             }
-            console.log(`stdout: ${stdout}`);
-            try {
-                resolve(JSON.parse(stdout))
-            } catch (error) {
-                throw error
-            }
-
+            // console.log(`stdout: ${stdout}`);
+            resolve(stdout)
         });
     })
 }
 
-export const startServer = async (instance_name, zone = false) => {
-    if (!zone) {
-        zone = getZones()[0]
+export const startServer = async (instance_name = "sfu", zone_idx = 0) => {
+
+    let zone = getZones()[zone_idx]
+    let json = await getInstanceList()
+    json = JSON.parse(json)
+    json = json.filter(inst => inst["name"].indexOf("sfu") !== -1)
+
+    console.log("number of instances running", json.length)
+    if (json.length < MAX_INSTANCES) {
+        const start_instance_name = instance_name + "-" + (json.length + 1)
+        let cmd = `gcloud beta compute instances create ${start_instance_name} --zone=${zone} --tags=sfu --image-family=ubuntu-2004-lts --image-project=ubuntu-os-cloud --maintenance-policy=TERMINATE  --machine-type=n1-standard-2 --boot-disk-type=pd-ssd --metadata-from-file startup-script=/usr/src/app/startup.sh --create-disk size=100GB,type=pd-ssd,auto-delete=yes --format=json` //--scopes=logging-write,compute-rw,cloud-platform
+        try {
+            const resp = await runCommand(cmd)
+            if (resp.indexOf("Created") !== -1) {
+                let json = await getInstanceList()
+                json = JSON.parse(json)
+                const current_instance = json.find(inst => inst["name"] === instance_name)
+                if (!current_instance) {
+                    throw new Error("current created instance not found some major issue")
+                }
+                console.log("instanced created!!!", current_instance)
+                return current_instance
+            } else {
+                if (zone_idx < getZones().length)
+                    return await startServer(instance_name, zone_idx + 1)
+                else {
+                    console.log("exhuasted all zones")
+                    return false
+                }
+            }
+        } catch (error) {
+            console.error(error)
+        }
+
+    } else {
+        console.log("cannot start more instances")
     }
-    let res = await getInstanceList()
-    console.log(json)
-    
-    let cmd = `gcloud beta compute instances create ${instance_name} --zone=${zone} --tags=sfu --image-family=ubuntu-2004-lts --image-project=ubuntu-os-cloud --maintenance-policy=TERMINATE  --machine-type=n1-standard-2 --boot-disk-type=pd-ssd --metadata-from-file startup-script=/usr/src/app/startup.sh --create-disk size=100GB,type=pd-ssd,auto-delete=yes --format=json` //--scopes=logging-write,compute-rw,cloud-platform
-    return runCommand(cmd)
 
 }
 
@@ -49,7 +68,7 @@ export const deleteServer = (instance_name, zone) => {
 }
 
 export const getInstanceList = () => {
-    let cmd = `gcloud beta compute instances list --filter='tags:sfu' --format=json `
+    let cmd = `gcloud beta compute instances list --format=json ` //  --filter='tags:sfu'
     return runCommand(cmd)
 }
 

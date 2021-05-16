@@ -18,6 +18,8 @@ services:
         environment:
             - ETCD=http://0.0.0.0:2379
             - LEASE_TEMP_TIMEOUT=5
+            - MAX_GCP_INSTANCES=2
+            - MY_IP=5.9.18.28
         network_mode: host
         depends_on:
             - etcd

@@ -3,9 +3,15 @@ const http = require('http');
 const cors = require('cors')
 const app = express()
 const { Etcd3 } = require('etcd3');
-import { startServer, deleteServer, getZones, getInstanceList } from "./gcp"
+import { startServer, deleteServer } from "./gcp"
 
 console.log("process.env.ETCD", process.env.ETCD)
+
+const MAX_PEER_PER_SERVER = 100
+const MAX_LOAD = 70 //start new instance after 70% load
+const MAX_PEER_HOST_MAPPING = {
+    "5.9.18.28": 10
+}
 
 const client = new Etcd3({
     "hosts": process.env.ETCD || "localhost:2379"
@@ -30,6 +36,8 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 
+
+
 io.on('connection', (socket) => {
     console.log('a user connected');
     socket.broadcast.emit('data', getHostData());
@@ -42,12 +50,6 @@ io.on('connection', (socket) => {
 
 app.get('/', async (req, res) => {
     res.send('ping server')
-    let res = await startServer("sfu-1", false)
-    if (res.indexOf("Created") !== -1) {
-        console.log("created!!")
-    }
-    // await getZones()
-
 })
 
 let session_host_tree = {}
@@ -208,8 +210,10 @@ const findAndGetHost = async (id, req, res) => {
                     } else {
                         hostKey = sortedHostKey
                     }
-                    console.log("hostKey", hostKey, currentHosts[hostKey][0])
+                    const load = currentHosts[hostKey][0]
+                    console.log("hostKey", hostKey, load)
                     hostkey = hostKey.replace("available-hosts/", "").replace("::", ":")
+
 
                     // there can be a gap in between when host is assigned and sfu starts a connection
                     // in that gap we will assign the same host
@@ -256,11 +260,94 @@ app.get("/session/:id", async (req, res) => {
 })
 
 
+/** this will check loads acorss all server and add/delete instances as needed */
+
+let waitForHost = false
+
+let gcp_hosts = []
+
+const autoScaleServerLoads = async () => {
+    const currentHosts = {
+        ...avaiable_hosts
+    }
+
+    console.log("autoScaleServerLoads current hosts", currentHosts)
+    const filterhosts = Object.keys(currentHosts).filter(host => {
+        if (process.env.MY_IP && host.indexOf(process.env.MY_IP) !== -1) {
+            //TEMP code skipping current server for load
+            return false
+        }
+        const cpu1 = parseFloat(currentHosts[host][0].split("-")[1])
+        console.log("cpu", cpu1, "host", host)
+        return cpu1 < MAX_LOAD
+    })
+
+    if (filterhosts.length > 0) {
+        console.log("all good server loads under 70%")
+    } else {
+        console.log("all server load over 70% need to start a new server")
+        if (waitForHost) {
+            console.log("waiting for server to start")
+
+            gcp_hosts.map(host => {
+
+                if (!host["ready"]) {
+                    const found = Object.keys(currentHosts).find(host => {
+                        console.log("checking ", host, " with", host_ip)
+                        return host.indexOf(host["host_ip"]) !== -1
+                    })
+                    host["ready"] = found
+                    waitForHost = false
+                }
+                return host
+            })
+
+        } else {
+            const current_instance = await startServer()
+            if (current_instance) {
+                console.log("current instance", current_instance)
+                const host_ip = current_instance["networkInterfaces"][0]["accessConfigs"].find(cfg => cfg.name === "external-nat")
+                console.log("host ip", host_ip)
+                waitForHost = true
+                gcp_hosts.push({
+                    "host_ip": host_ip,
+                    "ready": false
+                })
+            }
+        }
+
+        return
+        //not going further
+    }
+
+    await calc_session_stats()
+
+    let empty_session_hosts = []
+    Object.keys(currentHosts).forEach(host => {
+        host = host.replace("available-hosts/", "")
+        if (process.env.MY_IP && host.indexOf(process.env.MY_IP) !== -1) {
+            console.log("skipping current host", host)
+        } else {
+            if (session_host_tree[host]) {
+                console.log("session active on ", host, Object.key(session_host_tree[host].length))
+            } else {
+                console.log("no sessions active on host ", host, " can be deleted!")
+                empty_session_hosts.push(host)
+            }
+        }
+    })
+
+
+}
 
 const PORT = process.env.PORT || 4000
 server.listen(PORT, async function () {
     // server ready to accept connections here
     console.log("server has started", PORT)
+
+    setInterval(async () => {
+        await autoScaleServerLoads()
+    }, 1000)
 
     const hosts = await client.getAll().prefix('available-hosts/').keys();
     console.log('available hosts:', hosts);
@@ -327,10 +414,11 @@ server.listen(PORT, async function () {
 
 
             })
-            .on('put', (res) => {
+            .on('put', async (res) => {
                 const host = res.key.toString()
                 const data = res.value.toString()
                 console.log(host, ' ping ', data) //, data
+
                 io.emit("pingdata", {
                     "host": host,
                     "data": data
@@ -350,3 +438,4 @@ server.listen(PORT, async function () {
     });
 
 });
+
