@@ -1,0 +1,116 @@
+# not used now 
+version: "3.7"
+
+services:
+    etcd:
+        image: gcr.io/etcd-development/etcd:v3.4.9
+        entrypoint: "/usr/local/bin/etcd"
+        command: "--listen-client-urls http://0.0.0.0:2379 --advertise-client-urls http://0.0.0.0:2379"
+        network_mode: host
+        # ports:
+        #     - 2379:2379
+
+    server:
+        container_name: server
+        build:
+            context : ./server
+        image: xtechsample/server-ion:latest
+        restart: always
+        environment:
+            - ETCD=http://0.0.0.0:2379
+        network_mode: host
+        depends_on:
+            - etcd
+        # ports:
+        #     - 4000:4000
+
+    
+
+    prometheus:
+        image: prom/prometheus:latest
+        # ports:
+        #     - 9090:9090
+        network_mode: host
+        volumes:
+            - "./cfgs/prometheus.yml:/etc/prometheus/prometheus.yml"
+
+    
+    sfuA:
+        image: xtechsample/ion-cluster:latest
+        build:
+            dockerfile: Dockerfile
+            context: ./ion-cluster
+        command: ["server", "-c", "/configs/sfu.toml", "-a", ":7001"]
+        volumes:
+            - "./cfgs/config-dockerA.toml:/configs/sfu.toml"
+        environment:
+            ION_SIGNAL_FQDN: 0.0.0.0:7001
+        network_mode: host
+        restart: always
+        # ports:
+        #     - "9000-10000:9000-10000/udp"
+        #     - "7000:7001"
+
+    appA:
+        container_name: appA
+        build: 
+            context: ./client
+        image: xtechsample/client-ion:latest
+        restart: always
+        environment:
+            - PORT=4001
+            - ETCD=http://0.0.0.0:2379
+            - HEALTH_INTERVAL=10000
+            - IP=5.9.18.28
+            - SFU_PORT=7002
+        # ports:
+        #     - 4001:4001
+        network_mode: host
+        depends_on:
+            - server
+            - sfu
+
+    sfuB:
+        image: xtechsample/ion-cluster:latest
+        build:
+            dockerfile: Dockerfile
+            context: ./ion-cluster
+        command: ["server", "-c", "/configs/sfu.toml", "-a", ":7002"]
+        volumes:
+            - "./cfgs/config-dockerB.toml:/configs/sfu.toml"
+        environment:
+            ION_SIGNAL_FQDN: 0.0.0.0:7002
+        network_mode: host
+        # links:
+        #     - sfuA
+        # ports:
+        #     - "8000-9000:8000-9000/udp"
+        #     - "7002:7002"
+
+    appB:
+        container_name: appB
+        build: 
+            context: ./client
+        image: xtechsample/client-ion
+        restart: always
+        environment:
+            - PORT=4002
+            - ETCD=http://0.0.0.0:2379
+            - HEALTH_INTERVAL=10000
+            - IP=5.9.18.28
+            - SFU_PORT=7002
+        # ports:
+        #     - 4002:4002
+        network_mode: host
+        depends_on:
+            - server
+            - sfuB
+
+    # caddy:
+    #     image: caddy:2.3.0-alpine
+    #     restart: unless-stopped
+    #     ports:
+    #         - "85:80"
+    #         - "445:443"
+    #     volumes:
+    #         - ./caddy/Caddyfile:/etc/caddy/Caddyfile

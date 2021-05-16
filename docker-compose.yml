@@ -33,77 +33,33 @@ services:
         volumes:
             - "./cfgs/prometheus.yml:/etc/prometheus/prometheus.yml"
 
-
-    sfuA:
-        image: xtechsample/ion-cluster:latest
-        build:
-            dockerfile: Dockerfile
-            context: ./ion-cluster
-        command: ["server", "-c", "/configs/sfu.toml", "-a", ":7001"]
-        volumes:
-            - "./cfgs/config-dockerA.toml:/configs/sfu.toml"
-        environment:
-            ION_SIGNAL_FQDN: 0.0.0.0:7001
-        network_mode: host
-        restart: always
-        # ports:
-        #     - "9000-10000:9000-10000/udp"
-        #     - "7000:7001"
-
-    appA:
-        container_name: appA
+    
+    sfu:
+        image: xtechsample/ion-sfu:latest-allrpc
         build: 
-            context: ./client
-        image: xtechsample/client-ion:latest
-        restart: always
-        environment:
-            - PORT=4001
-            - ETCD=http://0.0.0.0:2379
-            - HEALTH_INTERVAL=10000
-            - IP=5.9.18.28
-            - SFU_PORT=7001
-        # ports:
-        #     - 4001:4001
+            context: ./ion-sfu
+            dockerfile: cmd/signal/allrpc/Dockerfile
+        command: ["-c", "/configs/sfu.toml", "-jaddr", ":7002", "-gaddr" , ":50052", "-eaddr", "0.0.0.0:2379", "-ipaddr", "5.9.18.28", "-maddr", ":8100"]
+        volumes:
+            - "./cfgs/sfuA.toml:/configs/sfu.toml"
         network_mode: host
-        depends_on:
-            - server
-            - sfuA
+        # ports:
+        #     - "10000-11000:10000-11000/udp"
+        #     - 7001:7001
+            
 
     sfuB:
-        image: xtechsample/ion-cluster:latest
-        build:
-            dockerfile: Dockerfile
-            context: ./ion-cluster
-        command: ["server", "-c", "/configs/sfu.toml", "-a", ":7002"]
-        volumes:
-            - "./cfgs/config-dockerB.toml:/configs/sfu.toml"
-        environment:
-            ION_SIGNAL_FQDN: 0.0.0.0:7002
-        network_mode: host
-        # links:
-        #     - sfuA
-        # ports:
-        #     - "8000-9000:8000-9000/udp"
-        #     - "7002:7002"
-
-    appB:
-        container_name: appB
+        image: xtechsample/ion-sfu:latest-allrpc
         build: 
-            context: ./client
-        image: xtechsample/client-ion
-        restart: always
-        environment:
-            - PORT=4002
-            - ETCD=http://0.0.0.0:2379
-            - HEALTH_INTERVAL=10000
-            - IP=5.9.18.28
-            - SFU_PORT=7002
-        # ports:
-        #     - 4002:4002
+            context: ./ion-sfu
+            dockerfile: cmd/signal/allrpc/Dockerfile
+        command: ["-c", "/configs/sfu.toml", "-jaddr", ":7003", "-gaddr" , ":50053", "-eaddr", "0.0.0.0:2379", "-ipaddr", "5.9.18.28", "-maddr", ":8102"]
+        volumes:
+            - "./cfgs/sfuB.toml:/configs/sfu.toml"
         network_mode: host
-        depends_on:
-            - server
-            - sfuB
+        # ports:
+        #     - "14000-15000:14000-15000/udp"
+    
 
     # caddy:
     #     image: caddy:2.3.0-alpine

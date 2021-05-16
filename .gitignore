@@ -4,3 +4,7 @@ server/node_modules/*
 server/node_modules
 ion-cluster
 ion-cluster/*
+ion-sfu
+ion-sfu/*
+ion-sdk-go
+ion-sdk-go/*

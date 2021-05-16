@@ -81,8 +81,7 @@ GIT_SSH_COMMAND='ssh -i /home/manish/id_rsa -o UserKnownHostsFile=/dev/null -o S
 sudo ufw allow 22
 sudo ufw allow 80
 sudo ufw allow 7001
-sudo ufw allow 4001
-sudo ufw allow 9000:10000/udp
+sudo ufw allow 10000:11000/udp
 sudo ufw enable
 
 cd /home/manish/live_ion_cluster
@@ -94,7 +93,7 @@ cat my_password.txt | docker login --username exceltech --password-stdin
 IP=$(curl -H "Metadata-Flavor: Google" http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip)
 echo $IP
 
-sed "s/{ip}/$IP/g" docker-compose-gcp.yml.sample >> docker-compose-gcp.yml
+sed "s/{ip}/$IP/g" docker-compose-gcp-template.yml >> docker-compose-gcp.yml
 
 # sudo docker-compose -f docker-compose-gcp.yml build
 sudo docker-compose -f docker-compose-gcp.yml up -d 

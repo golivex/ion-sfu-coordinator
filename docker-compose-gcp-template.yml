@@ -1,0 +1,25 @@
+version: "3.7"
+
+services:
+
+    prometheus:
+        image: prom/prometheus:latest
+        network_mode: host
+        volumes:
+            - "./cfgs/prometheus.yml:/etc/prometheus/prometheus.yml"
+
+
+    sfu:
+        image: xtechsample/ion-sfu:latest-allrpc
+        build: 
+            context: ./ion-sfu
+            dockerfile: cmd/signal/allrpc/Dockerfile
+        command: ["-c", "/configs/sfu.toml", "-jaddr", ":7001", "-eaddr", "5.9.18.28:2379", "-ipaddr", "{ip}", "-maddr", ":8100"]
+        volumes:
+            - "./cfgs/sfuA.toml:/configs/sfu.toml"
+        network_mode: host
+        # ports:
+        #     - "10000-11000:10000-11000/udp"
+        #     - 7001:7001
+
+    

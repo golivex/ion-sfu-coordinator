@@ -92,7 +92,6 @@ const PORT = process.env.PORT || 4001
 const getKey = () => {
     const data = getIdentifyData()
     const key = 'available-hosts/' + data.ip + ":" + data.port
-    console.log("key", key)
     return key
 }
 
