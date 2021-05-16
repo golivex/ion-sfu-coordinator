@@ -3,6 +3,7 @@ const http = require('http');
 const cors = require('cors')
 const app = express()
 const { Etcd3 } = require('etcd3');
+import { startServer, deleteServer, getZones, getInstanceList } from "./gcp"
 
 console.log("process.env.ETCD", process.env.ETCD)
 
@@ -39,14 +40,105 @@ io.on('connection', (socket) => {
 
 
 
-app.get('/', (req, res) => {
+app.get('/', async (req, res) => {
     res.send('ping server')
+    await startServer("sfu-1" , false)
+    await getInstanceList()
+    // await getZones()
+    
 })
 
+let session_host_tree = {}
+
+let timeoutId = false
+
+const debounce_calc_session_stats = async () => {
+    if (timeoutId) {
+        clearTimeout(timeoutId)
+    }
+    timeoutId = setTimeout(async () => {
+        await calc_session_stats()
+    }, 10)
+}
+
+const calc_session_stats = async () => {
+    const sessions = await client.getAll().prefix('/session/').keys();
+    console.log("sessions", sessions)
+
+    if (sessions.length === 0)
+        session_host_tree = {}
+
+    session_host_tree = {}
+    sessions.forEach(session => {
+        if (session.indexOf("node") > 0 && session.indexOf("peer") > 0 && session.indexOf("track") > 0) {
+            const session_split = session.split("/")
+            const name = session_split[2]
+            const node = session_split[4]
+            const peer = session_split[6]
+            const track = session_split[8]
+            const trackType = session_split[10]
+            if (!session_host_tree[node])
+                session_host_tree[node] = {}
+
+            if (!session_host_tree[node][name]) {
+                session_host_tree[node][name] = {}
+            }
+            if (!session_host_tree[node][name][peer]) {
+                session_host_tree[node][name][peer] = [{
+                    "track": track,
+                    "trackType": trackType
+                }]
+            } else {
+                session_host_tree[node][name][peer].push({
+                    "track": track,
+                    "trackType": trackType
+                })
+            }
+        }
+        if (session.indexOf("node") > 0 && session.indexOf("peer") > 0) {
+            const session_split = session.split("/")
+            const name = session_split[2]
+            const node = session_split[4]
+            const peer = session_split[6]
+            if (!session_host_tree[node])
+                session_host_tree[node] = {}
+
+            if (!session_host_tree[node][name]) {
+                session_host_tree[node][name] = {}
+            }
+            if (!session_host_tree[node][name][peer]) {
+                session_host_tree[node][name][peer] = []
+            }
+        }
+        if (session.indexOf("node") > 0) {
+            const session_split = session.split("/")
+            const name = session_split[2]
+            const node = session_split[4]
+            if (!session_host_tree[node])
+                session_host_tree[node] = {}
+
+            if (!session_host_tree[node][name])
+                session_host_tree[node][name] = {}
+        }
+    })
+    Object.keys(session_host_tree).forEach(host => {
+        const rooms = Object.keys(session_host_tree[host]).length
+        let peers = 0
+        Object.keys(session_host_tree[host]).forEach(room => {
+            peers = peers + Object.keys(session_host_tree[host][room]).length
+        })
+        session_host_tree[host]["rooms"] = rooms
+        session_host_tree[host]["peers"] = peers
+    })
+}
 
 app.get("/stats", async (req, res) => {
     const sessions = await client.getAll().prefix('/session/').keys();
-    res.json(sessions)
+    res.json({
+        "tree": session_host_tree,
+        "sessions": sessions,
+        "hosts": await client.getAll().prefix('available-hosts/').keys()
+    })
 })
 
 
@@ -119,7 +211,7 @@ const findAndGetHost = async (id, req, res) => {
 
                     // there can be a gap in between when host is assigned and sfu starts a connection
                     // in that gap we will assign the same host
-                    const lease = client.lease(10, {
+                    const lease = client.lease(process.env.LEASE_TEMP_TIMEOUT || 5, {
                         autoKeepAlive: false
                     });
                     lease.on('lost', err => {
@@ -173,20 +265,32 @@ server.listen(PORT, async function () {
 
     const sessions = await client.getAll().prefix('/session/').keys();
     console.log('available sessions:', sessions);
-    // sessions.forEach(async session => await client.delete().key(session))
+    // sessions.forEach(async session => await client.delete().key(session)) //temp
 
-    // client.watch().prefix("/session/").create().then(watcher => {
-    //     watcher
-    //         .on('delete', (res) => {
-    //             const session = res.key.toString()
-    //             console.log("session delete", session)
-    //         })
-    //         .on('put', (res) => {
-    //             const session = res.key.toString()
-    //             const data = res.value.toString()
-    //             console.log("session created", session, data)
-    //         });
-    // });
+    client.watch().prefix("/session/").create().then(watcher => {
+        watcher
+            .on('delete', async (res) => {
+                const session = res.key.toString()
+                if (session.indexOf("node") === -1) {
+                    console.log("session closed", session)
+                    const sessions = await client.getAll().prefix('/session/' + session).keys();
+                    console.log('deleting all session keys', sessions);
+                    await Promise.all(sessions.map(session => {
+                        return new Promise(async (resolve) => {
+                            await client.delete().key(session)
+                            resolve()
+                        })
+                    }))
+                }
+                await debounce_calc_session_stats()
+            })
+            .on('put', async (res) => {
+                // const session = res.key.toString()
+                // const data = res.value.toString()
+                // console.log("session created", session, data)
+                await debounce_calc_session_stats()
+            });
+    });
 
     client.watch().prefix("available-hosts/").create().then(watcher => {
         watcher

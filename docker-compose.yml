@@ -9,17 +9,18 @@ services:
         # ports:
         #     - 2379:2379
 
-    # server:
-    #     container_name: server
-    #     build:
-    #         context : ./server
-    #     image: xtechsample/server-ion:latest
-    #     restart: always
-    #     environment:
-    #         - ETCD=http://0.0.0.0:2379
-    #     network_mode: host
-    #     depends_on:
-    #         - etcd
+    server:
+        container_name: server
+        build:
+            context : ./server
+        image: xtechsample/server-ion:latest
+        restart: always
+        environment:
+            - ETCD=http://0.0.0.0:2379
+            - LEASE_TEMP_TIMEOUT=5
+        network_mode: host
+        depends_on:
+            - etcd
 
     
 
@@ -46,18 +47,75 @@ services:
         #     - 7001:7001
             
 
-    sfuB:
-        image: xtechsample/ion-sfu:latest-allrpc
-        build: 
-            context: ./ion-sfu
-            dockerfile: cmd/signal/allrpc/Dockerfile
-        command: ["-c", "/configs/sfu.toml", "-jaddr", ":7003", "-gaddr" , ":50053", "-eaddr", "0.0.0.0:2379", "-ipaddr", "5.9.18.28", "-maddr", ":8102"]
-        volumes:
-            - "./cfgs/sfuB.toml:/configs/sfu.toml"
-        network_mode: host
-        # ports:
-        #     - "14000-15000:14000-15000/udp"
+    # sfuB:
+    #     image: xtechsample/ion-sfu:latest-allrpc
+    #     build: 
+    #         context: ./ion-sfu
+    #         dockerfile: cmd/signal/allrpc/Dockerfile
+    #     command: ["-c", "/configs/sfu.toml", "-jaddr", ":7003", "-gaddr" , ":50053", "-eaddr", "0.0.0.0:2379", "-ipaddr", "5.9.18.28", "-maddr", ":8102"]
+    #     volumes:
+    #         - "./cfgs/sfuB.toml:/configs/sfu.toml"
+    #     network_mode: host
+
+    # sfuB-1:
+    #     image: xtechsample/ion-sfu:latest-allrpc
+    #     build: 
+    #         context: ./ion-sfu
+    #         dockerfile: cmd/signal/allrpc/Dockerfile
+    #     command: ["-c", "/configs/sfu.toml", "-jaddr", ":7004", "-gaddr" , ":50054", "-eaddr", "0.0.0.0:2379", "-ipaddr", "5.9.18.28", "-maddr", ":8103"]
+    #     volumes:
+    #         - "./cfgs/sfuB.toml:/configs/sfu.toml"
+    #     network_mode: host
+
+    # sfuB-2:
+    #     image: xtechsample/ion-sfu:latest-allrpc
+    #     build: 
+    #         context: ./ion-sfu
+    #         dockerfile: cmd/signal/allrpc/Dockerfile
+    #     command: ["-c", "/configs/sfu.toml", "-jaddr", ":7005", "-gaddr" , ":50055", "-eaddr", "0.0.0.0:2379", "-ipaddr", "5.9.18.28", "-maddr", ":8104"]
+    #     volumes:
+    #         - "./cfgs/sfuB.toml:/configs/sfu.toml"
+    #     network_mode: host
+
+    # sfuB-3:
+    #     image: xtechsample/ion-sfu:latest-allrpc
+    #     build: 
+    #         context: ./ion-sfu
+    #         dockerfile: cmd/signal/allrpc/Dockerfile
+    #     command: ["-c", "/configs/sfu.toml", "-jaddr", ":7006", "-gaddr" , ":50056", "-eaddr", "0.0.0.0:2379", "-ipaddr", "5.9.18.28", "-maddr", ":8105"]
+    #     volumes:
+    #         - "./cfgs/sfuB.toml:/configs/sfu.toml"
+    #     network_mode: host
+
+    # sfuB-4:
+    #     image: xtechsample/ion-sfu:latest-allrpc
+    #     build: 
+    #         context: ./ion-sfu
+    #         dockerfile: cmd/signal/allrpc/Dockerfile
+    #     command: ["-c", "/configs/sfu.toml", "-jaddr", ":7007", "-gaddr" , ":50057", "-eaddr", "0.0.0.0:2379", "-ipaddr", "5.9.18.28", "-maddr", ":8106"]
+    #     volumes:
+    #         - "./cfgs/sfuB.toml:/configs/sfu.toml"
+    #     network_mode: host
+
+    # sfuB-5:
+    #     image: xtechsample/ion-sfu:latest-allrpc
+    #     build: 
+    #         context: ./ion-sfu
+    #         dockerfile: cmd/signal/allrpc/Dockerfile
+    #     command: ["-c", "/configs/sfu.toml", "-jaddr", ":7008", "-gaddr" , ":50058", "-eaddr", "0.0.0.0:2379", "-ipaddr", "5.9.18.28", "-maddr", ":8107"]
+    #     volumes:
+    #         - "./cfgs/sfuB.toml:/configs/sfu.toml"
+    #     network_mode: host
     
+    # sfuB-6:
+    #     image: xtechsample/ion-sfu:latest-allrpc
+    #     build: 
+    #         context: ./ion-sfu
+    #         dockerfile: cmd/signal/allrpc/Dockerfile
+    #     command: ["-c", "/configs/sfu.toml", "-jaddr", ":7009", "-gaddr" , ":50059", "-eaddr", "0.0.0.0:2379", "-ipaddr", "5.9.18.28", "-maddr", ":8108"]
+    #     volumes:
+    #         - "./cfgs/sfuB.toml:/configs/sfu.toml"
+    #     network_mode: host
 
     # caddy:
     #     image: caddy:2.3.0-alpine
