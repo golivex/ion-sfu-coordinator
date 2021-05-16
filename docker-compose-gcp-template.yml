@@ -13,7 +13,7 @@ services:
         image: xtechsample/ion-sfu:latest-allrpc
         command: ["-c", "/configs/sfu.toml", "-jaddr", ":7001" , "-gaddr" , ":50051" , "-eaddr", "5.9.18.28:2379", "-ipaddr", "{ip}", "-maddr", ":8100"]
         volumes:
-            - "./cfgs/sfuA.toml:/configs/sfu.toml"
+            - "./cfgs/sfu-gcp.toml:/configs/sfu.toml"
         network_mode: host
         restart: always
         # ports:

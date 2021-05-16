@@ -36,7 +36,6 @@ export const startServer = async (instance_name = "sfu", zone_idx = 0) => {
         let cmd = `gcloud beta compute instances create ${start_instance_name} --zone=${zone} --tags=sfu --image-family=ubuntu-2004-lts --image-project=ubuntu-os-cloud --maintenance-policy=TERMINATE  --machine-type=n1-standard-2 --boot-disk-type=pd-ssd --metadata-from-file startup-script=/usr/src/app/startup.sh --create-disk size=100GB,type=pd-ssd,auto-delete=yes --format=json` //--scopes=logging-write,compute-rw,cloud-platform
         try {
             const resp = await runCommand(cmd)
-            console.log("resp", resp)
             if (resp.indexOf("Created") !== -1) {
                 let json = await getInstanceList()
                 json = JSON.parse(json)

@@ -2,7 +2,7 @@ const express = require('express')
 const http = require('http');
 const cors = require('cors')
 const app = express()
-const { Etcd3 } = require('etcd3');
+const { Etcd3, EtcdLockFailedError } = require('etcd3');
 import { startServer, deleteServer, getInstanceList } from "./gcp"
 
 console.log("process.env.ETCD", process.env.ETCD)
@@ -67,7 +67,7 @@ const debounce_calc_session_stats = async () => {
 
 const calc_session_stats = async () => {
     const sessions = await client.getAll().prefix('/session/').keys();
-    console.log("sessions", sessions)
+    // console.log("sessions", sessions)
 
     if (sessions.length === 0)
         session_host_tree = {}
@@ -212,7 +212,7 @@ const findAndGetHost = async (id, req, res) => {
                     }
                     const load = currentHosts[hostKey][0]
                     console.log("hostKey", hostKey, load)
-                    hostkey = hostKey.replace("available-hosts/", "").replace("::", ":")
+                    hostKey = hostKey.replace("available-hosts/", "").replace("::", ":")
 
 
                     // there can be a gap in between when host is assigned and sfu starts a connection
@@ -223,8 +223,8 @@ const findAndGetHost = async (id, req, res) => {
                     lease.on('lost', err => {
                         console.log('We lost our lease as a result of this error:', err);
                     })
-                    await lease.put("/temp" + id).value(hostkey).exec();
-                    res.send(hostkey)
+                    await lease.put("/temp" + id).value(hostKey).exec();
+                    res.send(hostKey)
                     resolve()
                 })
             })
@@ -317,7 +317,7 @@ const autoScaleServerLoads = async () => {
     }
 
     let skipProcess = false
-    const filterhosts = Object.keys(currentHosts).filter(host => {
+    let filterhosts = Object.keys(currentHosts).filter(host => {
         // if (process.env.MY_IP && host === process.env.MY_IP) {
         //     console.log("my ip", process.env.MY_IP, "host", host)
         //     //TEMP code skipping current server for load
@@ -328,11 +328,14 @@ const autoScaleServerLoads = async () => {
         return cpu1 < MAX_LOAD
     })
 
-    if (filterhosts.length > 0 || Object.keys(currentHosts).length < (process.env.MINIMUM_HOSTS || 1)) {
-        console.log("all good server loads under 70%")
+    if (Object.keys(currentHosts).length < (process.env.MINIMUM_HOSTS || 1)) {
+        filterhosts = []
+    }
+    if (filterhosts.length > 0) {
+        console.log("all good server loads under 70%", filterhosts)
     } else {
         if (Object.keys(currentHosts).length < (process.env.MINIMUM_HOSTS || 1)) {
-            console.log("need minimum not of hosts so starting")
+            console.log("need minimum no of hosts so starting")
         } else {
             console.log("all server load over 70% need to start a new server")
         }
@@ -384,8 +387,8 @@ const autoScaleServerLoads = async () => {
                 if (!gcp_ip_name_map[host]) {
                     console.log("this is not a gcp host so not looking at deleting...", host)
                 }
-                if (session_host_tree[host]) {
-                    console.log("session active on ", host, Object.key(session_host_tree[host].length))
+                if (Object.keys(session_host_tree).find(key => key.indexOf(host) !== -1)) {
+                    console.log("session active on ", host)
                 } else {
                     console.log("no sessions active on host ", host, " can be deleted!", gcp_ip_name_map[host])
                     if (!gcp_inactive_map[host]) {

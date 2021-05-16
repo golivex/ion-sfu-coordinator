@@ -95,6 +95,17 @@ IP=$(curl -H "Metadata-Flavor: Google" http://metadata/computeMetadata/v1/instan
 echo $IP
 
 sed "s/{ip}/$IP/g" docker-compose-gcp-template.yml >> docker-compose-gcp.yml
+sed "s/{ip}/$IP/g" ./cfgs/sfu-gcp.template.toml >> ./cfgs/sfu-gcp.toml
+
+sudo ulimit -c unlimited
+sudo ulimit -SHn 1000000
+sudo sysctl -w net.ipv4.tcp_keepalive_time=60
+sudo sysctl -w net.ipv4.tcp_timestamps=0
+sudo sysctl -w net.ipv4.tcp_tw_reuse=1
+#sysctl -w net.ipv4.tcp_tw_recycle=0
+sudo sysctl -w net.core.somaxconn=65535
+sudo sysctl -w net.ipv4.tcp_max_syn_backlog=65535
+sudo sysctl -w net.ipv4.tcp_syncookies=1
 
 # sudo docker-compose -f docker-compose-gcp.yml build
 sudo docker-compose -f docker-compose-gcp.yml up -d 
