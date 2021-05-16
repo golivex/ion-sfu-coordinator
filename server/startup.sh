@@ -81,7 +81,8 @@ GIT_SSH_COMMAND='ssh -i /home/manish/id_rsa -o UserKnownHostsFile=/dev/null -o S
 sudo ufw allow 22
 sudo ufw allow 80
 sudo ufw allow 7001
-sudo ufw allow 10000:11000/udp
+sudo ufw allow 50051
+sudo ufw allow 10000:15000/udp
 sudo ufw enable
 
 cd /home/manish/live_ion_cluster

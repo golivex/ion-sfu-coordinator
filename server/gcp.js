@@ -1,5 +1,6 @@
 const { exec } = require("child_process");
 
+const MAX_INSTANCES = process.env.MAX_GCP_INSTANCES || 2
 
 const runCommand = (cmd) => {
     console.log(cmd)
@@ -34,6 +35,9 @@ export const startServer = async (instance_name, zone = false) => {
     if (!zone) {
         zone = getZones()[0]
     }
+    let res = await getInstanceList()
+    console.log(json)
+    
     let cmd = `gcloud beta compute instances create ${instance_name} --zone=${zone} --tags=sfu --image-family=ubuntu-2004-lts --image-project=ubuntu-os-cloud --maintenance-policy=TERMINATE  --machine-type=n1-standard-2 --boot-disk-type=pd-ssd --metadata-from-file startup-script=/usr/src/app/startup.sh --create-disk size=100GB,type=pd-ssd,auto-delete=yes --format=json` //--scopes=logging-write,compute-rw,cloud-platform
     return runCommand(cmd)
 

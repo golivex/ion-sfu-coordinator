@@ -42,10 +42,12 @@ io.on('connection', (socket) => {
 
 app.get('/', async (req, res) => {
     res.send('ping server')
-    await startServer("sfu-1" , false)
-    await getInstanceList()
+    let res = await startServer("sfu-1", false)
+    if (res.indexOf("Created") !== -1) {
+        console.log("created!!")
+    }
     // await getZones()
-    
+
 })
 
 let session_host_tree = {}
