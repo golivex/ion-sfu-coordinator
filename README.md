@@ -23,3 +23,5 @@ Observation
 ==============
 
 n1-standard-2  upto 20-30 clients cpu goes 90%
+n1-standard-4  upto 50 clients cpu goes 80%
+n2-standard-4  upto 50 clients cpu goes 70%

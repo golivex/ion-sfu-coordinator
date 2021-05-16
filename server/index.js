@@ -66,11 +66,38 @@ const debounce_calc_session_stats = async () => {
 }
 
 const calc_session_stats = async () => {
-    const sessions = await client.getAll().prefix('/session/').keys();
+    let sessions = await client.getAll().prefix('/session/').keys();
     // console.log("sessions", sessions)
+
 
     if (sessions.length === 0)
         session_host_tree = {}
+
+    let is_abandoned_session = false
+    if (Object.keys(avaiable_hosts).length > 0) {
+        await Promise.all(sessions.map(session => {
+            return new Promise(async resolve => {
+                if (session.indexOf("node") > 0) {
+                    const session_split = session.split("/")
+                    const name = session_split[2]
+                    const node = session_split[4]
+                    // check if node exists
+                    if (!Object.keys(avaiable_hosts).find(key => key.indexOf(node) !== -1)) {
+                        // first remove any abandoned sessions
+                        console.log("abanded session", session)
+                        await client.delete().key(session)
+                        is_abandoned_session = true
+                    }
+                    resolve()
+                }
+                resolve()
+            })
+        }))
+    }
+
+
+    if (is_abandoned_session)
+        sessions = await client.getAll().prefix('/session/').keys();
 
     session_host_tree = {}
     sessions.forEach(session => {
@@ -118,6 +145,8 @@ const calc_session_stats = async () => {
             const session_split = session.split("/")
             const name = session_split[2]
             const node = session_split[4]
+
+
             if (!session_host_tree[node])
                 session_host_tree[node] = {}
 
@@ -279,9 +308,10 @@ const autoScaleServerLoads = async () => {
         let count = 0
         let sum = 0
         avaiable_hosts[key].forEach(val => {
-            if (count < max)
-                sum = sum + parseFloat(val[0].split("-")[1])
-            count = count + 1
+            if (count < max) {
+                sum = sum + parseFloat(val.split("-")[1])
+                count = count + 1
+            }
         })
         currentHosts[ip] = sum / count
     })
@@ -392,29 +422,31 @@ const autoScaleServerLoads = async () => {
             if (process.env.MY_IP && host === process.env.MY_IP) {
                 console.log("skipping current host", host)
             } else {
+                console.log("checking inactive for ", host, gcp_ip_name_map)
                 if (!gcp_ip_name_map[host]) {
                     console.log("this is not a gcp host so not looking at deleting...", host)
-                }
-                if (Object.keys(session_host_tree).find(key => key.indexOf(host) !== -1)) {
-                    console.log("session active on ", host)
                 } else {
-                    console.log("no sessions active on host ", host, " can be deleted!", gcp_ip_name_map[host])
-                    if (!gcp_inactive_map[host]) {
-                        gcp_inactive_map[host] = new Date().getTime()
-                    }
-                    const timeDiff = (new Date().getTime() - gcp_inactive_map[host]) / 1000
-                    if (timeDiff > (process.env.GCP_EMPTY_SESSION_DELETE_WAIT || 1 * 60)) {
-                        console.log("host has had no session for 1 min so deleting it now!")
-                        if (Object.keys(currentHosts).length > (process.env.MINIMUM_HOSTS || 1)) {
-                            await deleteServer(gcp_ip_name_map[host]["name"], gcp_ip_name_map[host]["zone"])
-                            await new Promise(r => setTimeout(() => { r() }, 10000))
-                            return true //so that it doesn't delete more
-                        } else {
-                            console.log("cannot delete need atleast one host")
-                        }
-
+                    if (Object.keys(session_host_tree).find(key => key.indexOf(host) !== -1)) {
+                        console.log("session active on ", host)
                     } else {
-                        console.log("not deleting host as timeDiff less than 1 min", timeDiff)
+                        console.log("no sessions active on host ", host, " can be deleted!", gcp_ip_name_map[host])
+                        if (!gcp_inactive_map[host]) {
+                            gcp_inactive_map[host] = new Date().getTime()
+                        }
+                        const timeDiff = (new Date().getTime() - gcp_inactive_map[host]) / 1000
+                        if (timeDiff > (process.env.GCP_EMPTY_SESSION_DELETE_WAIT || 1 * 60)) {
+                            console.log("host has had no session for 1 min so deleting it now!")
+                            if (Object.keys(currentHosts).length > (process.env.MINIMUM_HOSTS || 1)) {
+                                await deleteServer(gcp_ip_name_map[host]["name"], gcp_ip_name_map[host]["zone"])
+                                await new Promise(r => setTimeout(() => { r() }, 10000))
+                                return true //so that it doesn't delete more
+                            } else {
+                                console.log("cannot delete need atleast one host")
+                            }
+
+                        } else {
+                            console.log("not deleting host as timeDiff less than 1 min", timeDiff)
+                        }
                     }
                 }
             }
