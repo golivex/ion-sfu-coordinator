@@ -265,57 +265,76 @@ app.get("/session/:id", async (req, res) => {
 let waitForHost = false
 
 let gcp_hosts = []
-
 let gcp_hosts_deadmap = {}
+let gcp_inactive_map = {}
 
 const autoScaleServerLoads = async () => {
-    const currentHosts = {
-        ...avaiable_hosts
+    const currentHosts = {}
+    Object.keys(avaiable_hosts).forEach(key => {
+        let ip = key.replace("available-hosts/", "")
+        if (ip.indexOf(":") !== -1) {
+            ip = ip.substr(0, ip.indexOf(":"))
+        }
+        currentHosts[ip] = avaiable_hosts[key][0]
+    })
+    console.log("autoScaleServerLoads current hosts", currentHosts)
+
+
+    let gcp_instance_list = await getInstanceList()
+    gcp_instance_list = JSON.parse(gcp_instance_list)
+
+    let gcp_ip_name_map = {}
+    if (Object.keys(currentHosts).length > 0) {
+        //first check if there are any dead gcp server
+        console.log("check for any dead instances....")
+        gcp_instance_list.forEach(async current_instance => {
+            if (current_instance["status"] !== "RUNNING") {
+                return
+            }
+            const host_ip = current_instance["networkInterfaces"][0]["accessConfigs"].find(cfg => cfg.name === "external-nat")["natIP"]
+            gcp_ip_name_map[host_ip] = {
+                "name": current_instance["name"],
+                "zone": current_instance['zone'].split("/").slice(-1).pop()
+            }
+            if (Object.keys(currentHosts).find(host => host === host_ip)) {
+                console.log("host ip found all good")
+                if (gcp_hosts_deadmap[host_ip]) {
+                    delete gcp_hosts_deadmap[host_ip]
+                }
+            } else {
+                console.log("this looks like a dead gcp instance wait to delete it", host_ip)
+                if (!gcp_hosts_deadmap[host_ip])
+                    gcp_hosts_deadmap[host_ip] = new Date().getTime()
+
+                const timeDiff = (new Date().getTime() - gcp_hosts_deadmap[host_ip]) / 1000
+                console.log("time diff on dead instance", timeDiff)
+                if (timeDiff > (process.env.GCP_DEAD_HOST_DELETE_WAIT || 5 * 60)) {
+                    console.log("instance is dead since", timeDiff, "so deleating it!")
+                    await deleteServer(gcp_ip_name_map[host_ip]["name"], gcp_ip_name_map[host_ip]["zone"])
+                }
+            }
+        })
     }
 
     let skipProcess = false
-
-    console.log("autoScaleServerLoads current hosts", Object.keys(currentHosts))
     const filterhosts = Object.keys(currentHosts).filter(host => {
-        if (process.env.MY_IP && host.indexOf(process.env.MY_IP) !== -1) {
-
-            console.log("my ip", process.env.MY_IP, "host", host)
-            //TEMP code skipping current server for load
-            return false
-        }
-        const cpu1 = parseFloat(currentHosts[host][0].split("-")[1])
+        // if (process.env.MY_IP && host === process.env.MY_IP) {
+        //     console.log("my ip", process.env.MY_IP, "host", host)
+        //     //TEMP code skipping current server for load
+        //     return false
+        // }
+        const cpu1 = parseFloat(currentHosts[host].split("-")[1])
         console.log("cpu", cpu1, "host", host)
         return cpu1 < MAX_LOAD
     })
 
-    if (filterhosts.length > 0) {
+    if (filterhosts.length > 0 || Object.keys(currentHosts).length < (process.env.MINIMUM_HOSTS || 1)) {
         console.log("all good server loads under 70%")
     } else {
-        console.log("all server load over 70% need to start a new server")
-
-        if (Object.keys(currentHosts).length > 0) {
-            //first check if there are any dead gcp server
-            console.log("check for any dead instances....")
-            let json = await getInstanceList()
-            json = JSON.parse(json)
-
-            json.forEach(async current_instance => {
-                const host_ip = current_instance["networkInterfaces"][0]["accessConfigs"].find(cfg => cfg.name === "external-nat")
-                if (Object.keys(currentHosts).indexOf(host_ip) !== -1) {
-                    console.log("host ip found all good")
-                } else {
-                    console.log("this looks like a dead gcp instance wait to delete it")
-                    if (!gcp_hosts_deadmap[host_ip])
-                        gcp_hosts_deadmap[host_ip] = new Date().getTime()
-
-                    const timeDiff = (new Date().getTime() - gcp_hosts_deadmap[host_ip]) / 1000
-                    console.log("time diff on dead instance", timeDiff)
-                    if (timeDiff > 5 * 60) {
-                        console.log("instance is dead since", timeDiff, "so deleating it!")
-                        await deleteServer(current_instance["name"])
-                    }
-                }
-            })
+        if (Object.keys(currentHosts).length < (process.env.MINIMUM_HOSTS || 1)) {
+            console.log("need minimum not of hosts so starting")
+        } else {
+            console.log("all server load over 70% need to start a new server")
         }
 
         if (waitForHost) {
@@ -329,7 +348,8 @@ const autoScaleServerLoads = async () => {
                         return host.indexOf(host["host_ip"]) !== -1
                     })
                     host["ready"] = found
-                    waitForHost = false
+                    if (found)
+                        waitForHost = false
                 }
                 return host
             })
@@ -338,11 +358,13 @@ const autoScaleServerLoads = async () => {
             const current_instance = await startServer()
             if (current_instance) {
                 waitForHost = true
-                console.log("current instance", current_instance)
-                const host_ip = current_instance["networkInterfaces"][0]["accessConfigs"].find(cfg => cfg.name === "external-nat")
+                // console.log("current instance", current_instance)
+                const host_ip = current_instance["networkInterfaces"][0]["accessConfigs"].find(cfg => cfg.name === "external-nat")["natIP"]
                 console.log("host ip", host_ip)
                 gcp_hosts.push({
                     "host_ip": host_ip,
+                    "name": current_instance["name"],
+                    "zone": current_instance["zone"].split("/").slice(-1).pop(),
                     "ready": false
                 })
             } else {
@@ -355,19 +377,38 @@ const autoScaleServerLoads = async () => {
     if (!skipProcess) {
         await calc_session_stats()
 
-        let empty_session_hosts = []
-        Object.keys(currentHosts).forEach(host => {
-            host = host.replace("available-hosts/", "")
-            if (process.env.MY_IP && host.indexOf(process.env.MY_IP) !== -1) {
+        Object.keys(currentHosts).find(async host => {
+            if (process.env.MY_IP && host === process.env.MY_IP) {
                 console.log("skipping current host", host)
             } else {
+                if (!gcp_ip_name_map[host]) {
+                    console.log("this is not a gcp host so not looking at deleting...", host)
+                }
                 if (session_host_tree[host]) {
                     console.log("session active on ", host, Object.key(session_host_tree[host].length))
                 } else {
-                    console.log("no sessions active on host ", host, " can be deleted!")
-                    empty_session_hosts.push(host)
+                    console.log("no sessions active on host ", host, " can be deleted!", gcp_ip_name_map[host])
+                    if (!gcp_inactive_map[host]) {
+                        gcp_inactive_map[host] = new Date().getTime()
+                    }
+                    const timeDiff = (new Date().getTime() - gcp_inactive_map[host]) / 1000
+                    if (timeDiff > (process.env.GCP_EMPTY_SESSION_DELETE_WAIT || 1 * 60)) {
+                        console.log("host has had no session for 1 min so deleting it now!")
+                        if (Object.keys(currentHosts).length > (process.env.MINIMUM_HOSTS || 1)) {
+                            await deleteServer(gcp_ip_name_map[host]["name"], gcp_ip_name_map[host]["zone"])
+                            await new Promise(r => setTimeout(() => { r() }, 10000))
+                            return true //so that it doesn't delete more
+                        } else {
+                            console.log("cannot delete need atleast one host")
+                        }
+
+                    } else {
+                        console.log("not deleting host as timeDiff less than 1 min", timeDiff)
+                    }
                 }
             }
+
+            return false
         })
     }
     setTimeout(async () => {
@@ -380,8 +421,10 @@ server.listen(PORT, async function () {
     // server ready to accept connections here
     console.log("server has started", PORT)
 
-
-    await autoScaleServerLoads()
+    setTimeout(async () => {
+        await autoScaleServerLoads()
+        //waiting for hosts to ping for atleast 5sec
+    }, 5000)
 
 
     const hosts = await client.getAll().prefix('available-hosts/').keys();

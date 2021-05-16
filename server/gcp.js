@@ -13,8 +13,8 @@ const runCommand = (cmd) => {
                 return;
             }
             if (stderr) {
-                console.log(`stderr: ${stderr}`);
-                // resolve(stderr)
+                // console.log(`stderr: ${stderr}`);
+                resolve(stderr)
                 return;
             }
             // console.log(`stdout: ${stdout}`);
@@ -40,7 +40,7 @@ export const startServer = async (instance_name = "sfu", zone_idx = 0) => {
             if (resp.indexOf("Created") !== -1) {
                 let json = await getInstanceList()
                 json = JSON.parse(json)
-                const current_instance = json.find(inst => inst["name"] === instance_name)
+                const current_instance = json.find(inst => inst["name"] === start_instance_name)
                 if (!current_instance) {
                     throw new Error("current created instance not found some major issue")
                 }
@@ -66,7 +66,7 @@ export const startServer = async (instance_name = "sfu", zone_idx = 0) => {
 }
 
 export const deleteServer = (instance_name, zone) => {
-    let cmd = `gcloud beta compute instances delete ${instance_name} --quiet --format=json` //--zone=${zone}
+    let cmd = `gcloud beta compute instances delete ${instance_name} --zone=${zone} --quiet --format=json` //--zone=${zone}
     return runCommand(cmd)
 }
 

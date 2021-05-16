@@ -20,7 +20,10 @@ services:
             - LEASE_TEMP_TIMEOUT=5
             - MAX_GCP_INSTANCES=2
             - MY_IP=5.9.18.28
-            - AUTO_SCALE_TIMEOUT=5000
+            - AUTO_SCALE_TIMEOUT=5000 # how long to wait before auto scaling starts
+            - GCP_DEAD_HOST_DELETE_WAIT=300 # how long to wait in sec before deleting a dead server
+            - GCP_EMPTY_SESSION_DELETE_WAIT=30 # how to long to wait in sec before deleting a empty session server
+            - MINIMUM_HOSTS=1
         network_mode: host
         depends_on:
             - etcd
