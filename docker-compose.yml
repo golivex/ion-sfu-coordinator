@@ -9,19 +9,17 @@ services:
         # ports:
         #     - 2379:2379
 
-    server:
-        container_name: server
-        build:
-            context : ./server
-        image: xtechsample/server-ion:latest
-        restart: always
-        environment:
-            - ETCD=http://0.0.0.0:2379
-        network_mode: host
-        depends_on:
-            - etcd
-        # ports:
-        #     - 4000:4000
+    # server:
+    #     container_name: server
+    #     build:
+    #         context : ./server
+    #     image: xtechsample/server-ion:latest
+    #     restart: always
+    #     environment:
+    #         - ETCD=http://0.0.0.0:2379
+    #     network_mode: host
+    #     depends_on:
+    #         - etcd
 
     
 

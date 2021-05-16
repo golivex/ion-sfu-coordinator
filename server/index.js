@@ -4,7 +4,6 @@ const cors = require('cors')
 const app = express()
 const { Etcd3 } = require('etcd3');
 
-
 console.log("process.env.ETCD", process.env.ETCD)
 
 const client = new Etcd3({
@@ -44,16 +43,12 @@ app.get('/', (req, res) => {
     res.send('ping server')
 })
 
-app.get("/stats", async (req, res) => {
-    const session = await client.getAll().prefix('/session/').keys();
 
-    res.json(await Promise.all(session.map(async key => {
-        return {
-            "session": key,
-            "host": await client.get(key).string()
-        }
-    })))
+app.get("/stats", async (req, res) => {
+    const sessions = await client.getAll().prefix('/session/').keys();
+    res.json(sessions)
 })
+
 
 const findAndGetHost = async (id, req, res) => {
     const sessionNode = await client.get("/session/" + id).string()
@@ -61,12 +56,21 @@ const findAndGetHost = async (id, req, res) => {
     // const currentHosts = await client.getAll().prefix('available-hosts/').keys();
 
     if (Object.keys(avaiable_hosts).length === 0) {
-        res.json("NO_HOSTS_RETRY")
+        res.send("NO_HOSTS_RETRY")
         return
     }
+    let hostExists = false
     if (sessionNode) {
+        //TODO: if server went down, then avaiable hosts will be empty but session will be assigned to a host
+        //but what is that host hasn't sent a ping yet so its not there in available hosts
+        // also if a sfu crashes, then its keys won't be deleted
+        hostExists = Object.keys(avaiable_hosts).find(key => {
+            return key.replace("::", ":").replace("available-hosts/", "") === sessionNode.replace("::", ":")
+        })
+    }
+    if (hostExists) {
         console.log("session node", sessionNode)
-        res.json(sessionNode.replace("::", ":"))
+        res.send(sessionNode.replace("::", ":"))
     } else {
         // this is a problem here because its possible that we are getting very high requests
         // and even before sfu starts we can give another host to the same session
@@ -80,7 +84,7 @@ const findAndGetHost = async (id, req, res) => {
             const existingHost = await client.get("/temp" + id)
             if (existingHost) {
                 console.log("host just assigned", existingHost)
-                return res.json(existingHost.replace("::", ":"))
+                return res.send(existingHost.replace("::", ":"))
             }
             await client.lock("/query/" + id).do(() => {
                 return new Promise(async (resolve) => {
@@ -115,9 +119,14 @@ const findAndGetHost = async (id, req, res) => {
 
                     // there can be a gap in between when host is assigned and sfu starts a connection
                     // in that gap we will assign the same host
-                    const lease = client.lease(2);
-                    await lease.put("/temp" + id).value(hostkey);
-                    res.json(hostkey)
+                    const lease = client.lease(10, {
+                        autoKeepAlive: false
+                    });
+                    lease.on('lost', err => {
+                        console.log('We lost our lease as a result of this error:', err);
+                    })
+                    await lease.put("/temp" + id).value(hostkey).exec();
+                    res.send(hostkey)
                     resolve()
                 })
             })
@@ -139,7 +148,7 @@ const findAndGetHost = async (id, req, res) => {
 app.get("/session/:id", async (req, res) => {
     const id = req.params.id
     if (id.length === 0) {
-        return res.json("Invalid ID")
+        return res.send("Invalid ID")
     }
     // this will provide the host which can serve new client
     // if session already exists in a sfu it will return that
@@ -162,30 +171,55 @@ server.listen(PORT, async function () {
     const hosts = await client.getAll().prefix('available-hosts/').keys();
     console.log('available hosts:', hosts);
 
-    const session = await client.getAll().prefix('/session/').keys();
-    console.log('available sessions:', session);
+    const sessions = await client.getAll().prefix('/session/').keys();
+    console.log('available sessions:', sessions);
+    // sessions.forEach(async session => await client.delete().key(session))
 
-    client.watch().prefix("/session/").create().then(watcher => {
-        watcher
-            .on('delete', (res) => {
-                const session = res.key.toString()
-                console.log("session delete", session)
-            })
-            .on('put', (res) => {
-                const session = res.key.toString()
-                const data = res.value.toString()
-                console.log("session created", session, data)
-            });
-    });
+    // client.watch().prefix("/session/").create().then(watcher => {
+    //     watcher
+    //         .on('delete', (res) => {
+    //             const session = res.key.toString()
+    //             console.log("session delete", session)
+    //         })
+    //         .on('put', (res) => {
+    //             const session = res.key.toString()
+    //             const data = res.value.toString()
+    //             console.log("session created", session, data)
+    //         });
+    // });
 
     client.watch().prefix("available-hosts/").create().then(watcher => {
         watcher
-            .on('delete', (res) => {
+            .on('delete', async (res) => {
                 const host = res.key.toString()
                 console.log("delete", host)
                 if (avaiable_hosts[host]) {
                     delete avaiable_hosts[host]
                 }
+
+                //if host gets dropped remove all sessions from the host
+                const sessions = await client.getAll().prefix('/session/').keys();
+                console.log(host, 'deleting available sessions:', sessions);
+
+                const actualSession = {}
+                await Promise.all(sessions.map(session => {
+                    return new Promise(async (resolve) => {
+                        // console.log(session.replace("::", ":"), host.replace("::", ":").replace("available-hosts/", ""), "index of", session.replace("::", ":").indexOf(host.replace("::", ":").replace("available-hosts/", "")))
+                        if (session.replace("::", ":").indexOf(host.replace("::", ":").replace("available-hosts/", "")) !== -1) {
+                            await client.delete().key(session)
+                            actualSession[session.split("/")[2]] = true
+                        }
+                        resolve()
+                    })
+
+                }))
+
+                console.log("also delete", Object.keys(actualSession))
+                Object.keys(actualSession).forEach(async session => {
+                    await client.delete().key("/session/" + session)
+                })
+
+
             })
             .on('put', (res) => {
                 const host = res.key.toString()
