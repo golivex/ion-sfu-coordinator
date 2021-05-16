@@ -189,7 +189,7 @@ const findAndGetHost = async (id, req, res) => {
                         ...avaiable_hosts
                     }
 
-                    console.log("current hosts", currentHosts)
+                    console.log("current hosts", Object.keys(currentHosts))
                     const sortedKeys = Object.keys(currentHosts).sort((key1, key2) => {
                         console.log(currentHosts[key1])
                         console.log(currentHosts[key2])
@@ -271,9 +271,11 @@ const autoScaleServerLoads = async () => {
         ...avaiable_hosts
     }
 
-    console.log("autoScaleServerLoads current hosts", currentHosts)
+    console.log("autoScaleServerLoads current hosts", Object.keys(currentHosts))
     const filterhosts = Object.keys(currentHosts).filter(host => {
         if (process.env.MY_IP && host.indexOf(process.env.MY_IP) !== -1) {
+
+            console.log("my ip", process.env.MY_IP, "host", host)
             //TEMP code skipping current server for load
             return false
         }
@@ -305,17 +307,19 @@ const autoScaleServerLoads = async () => {
         } else {
             const current_instance = await startServer()
             if (current_instance) {
+                waitForHost = true
                 console.log("current instance", current_instance)
                 const host_ip = current_instance["networkInterfaces"][0]["accessConfigs"].find(cfg => cfg.name === "external-nat")
                 console.log("host ip", host_ip)
-                waitForHost = true
                 gcp_hosts.push({
                     "host_ip": host_ip,
                     "ready": false
                 })
             }
         }
-
+        setTimeout(async () => {
+            await autoScaleServerLoads()
+        }, process.env.AUTO_SCALE_TIMEOUT || 5000)
         return
         //not going further
     }
@@ -336,8 +340,9 @@ const autoScaleServerLoads = async () => {
             }
         }
     })
-
-
+    setTimeout(async () => {
+        await autoScaleServerLoads()
+    }, process.env.AUTO_SCALE_TIMEOUT || 5000)
 }
 
 const PORT = process.env.PORT || 4000
@@ -345,9 +350,9 @@ server.listen(PORT, async function () {
     // server ready to accept connections here
     console.log("server has started", PORT)
 
-    setInterval(async () => {
-        await autoScaleServerLoads()
-    }, 1000)
+
+    await autoScaleServerLoads()
+
 
     const hosts = await client.getAll().prefix('available-hosts/').keys();
     console.log('available hosts:', hosts);

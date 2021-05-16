@@ -20,6 +20,7 @@ services:
             - LEASE_TEMP_TIMEOUT=5
             - MAX_GCP_INSTANCES=2
             - MY_IP=5.9.18.28
+            - AUTO_SCALE_TIMEOUT=5000
         network_mode: host
         depends_on:
             - etcd
