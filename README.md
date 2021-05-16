@@ -16,3 +16,10 @@ This is a crude solutions as of now
 the node in which we can start a new session
 
 this way we will be able to have large number of smaller conference with upto 200-300 peers per server (depending on server)
+
+
+
+Observation
+==============
+
+n1-standard-2  upto 20-30 clients cpu goes 90%

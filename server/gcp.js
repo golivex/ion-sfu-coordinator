@@ -33,7 +33,7 @@ export const startServer = async (instance_name = "sfu", zone_idx = 0) => {
     console.log("number of instances running", json.length)
     if (json.length < MAX_INSTANCES) {
         const start_instance_name = instance_name + "-" + new Date().getTime()
-        let cmd = `gcloud beta compute instances create ${start_instance_name} --zone=${zone} --tags=sfu --image-family=ubuntu-2004-lts --image-project=ubuntu-os-cloud --maintenance-policy=TERMINATE  --machine-type=n1-standard-2 --boot-disk-type=pd-ssd --metadata-from-file startup-script=/usr/src/app/startup.sh --create-disk size=100GB,type=pd-ssd,auto-delete=yes --format=json` //--scopes=logging-write,compute-rw,cloud-platform
+        let cmd = `gcloud beta compute instances create ${start_instance_name} --zone=${zone} --tags=sfu --image-family=ubuntu-2004-lts --image-project=ubuntu-os-cloud --maintenance-policy=TERMINATE  --machine-type=n1-standard-4 --boot-disk-type=pd-ssd --metadata-from-file startup-script=/usr/src/app/startup.sh --create-disk size=100GB,type=pd-ssd,auto-delete=yes --format=json` //--scopes=logging-write,compute-rw,cloud-platform
         try {
             const resp = await runCommand(cmd)
             if (resp.indexOf("Created") !== -1) {

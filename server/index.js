@@ -275,7 +275,15 @@ const autoScaleServerLoads = async () => {
         if (ip.indexOf(":") !== -1) {
             ip = ip.substr(0, ip.indexOf(":"))
         }
-        currentHosts[ip] = avaiable_hosts[key][0]
+        const max = 5
+        let count = 0
+        let sum = 0
+        avaiable_hosts[key].forEach(val => {
+            if (count < max)
+                sum = sum + parseFloat(val[0].split("-")[1])
+            count = count + 1
+        })
+        currentHosts[ip] = sum / count
     })
     console.log("autoScaleServerLoads current hosts", currentHosts)
 
@@ -323,7 +331,7 @@ const autoScaleServerLoads = async () => {
         //     //TEMP code skipping current server for load
         //     return false
         // }
-        const cpu1 = parseFloat(currentHosts[host].split("-")[1])
+        const cpu1 = parseFloat(currentHosts[host])
         console.log("cpu", cpu1, "host", host)
         return cpu1 < MAX_LOAD
     })
@@ -347,7 +355,7 @@ const autoScaleServerLoads = async () => {
 
                 if (!host["ready"]) {
                     const found = Object.keys(currentHosts).find(host => {
-                        console.log("checking ", host, " with", host_ip)
+                        console.log("checking ", host, " with", host["host_ip"])
                         return host.indexOf(host["host_ip"]) !== -1
                     })
                     host["ready"] = found
