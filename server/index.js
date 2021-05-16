@@ -3,7 +3,7 @@ const http = require('http');
 const cors = require('cors')
 const app = express()
 const { Etcd3 } = require('etcd3');
-import { startServer, deleteServer } from "./gcp"
+import { startServer, deleteServer, getInstanceList } from "./gcp"
 
 console.log("process.env.ETCD", process.env.ETCD)
 
@@ -266,10 +266,14 @@ let waitForHost = false
 
 let gcp_hosts = []
 
+let gcp_hosts_deadmap = {}
+
 const autoScaleServerLoads = async () => {
     const currentHosts = {
         ...avaiable_hosts
     }
+
+    let skipProcess = false
 
     console.log("autoScaleServerLoads current hosts", Object.keys(currentHosts))
     const filterhosts = Object.keys(currentHosts).filter(host => {
@@ -288,6 +292,32 @@ const autoScaleServerLoads = async () => {
         console.log("all good server loads under 70%")
     } else {
         console.log("all server load over 70% need to start a new server")
+
+        if (Object.keys(currentHosts).length > 0) {
+            //first check if there are any dead gcp server
+            console.log("check for any dead instances....")
+            let json = await getInstanceList()
+            json = JSON.parse(json)
+
+            json.forEach(async current_instance => {
+                const host_ip = current_instance["networkInterfaces"][0]["accessConfigs"].find(cfg => cfg.name === "external-nat")
+                if (Object.keys(currentHosts).indexOf(host_ip) !== -1) {
+                    console.log("host ip found all good")
+                } else {
+                    console.log("this looks like a dead gcp instance wait to delete it")
+                    if (!gcp_hosts_deadmap[host_ip])
+                        gcp_hosts_deadmap[host_ip] = new Date().getTime()
+
+                    const timeDiff = (new Date().getTime() - gcp_hosts_deadmap[host_ip]) / 1000
+                    console.log("time diff on dead instance", timeDiff)
+                    if (timeDiff > 5 * 60) {
+                        console.log("instance is dead since", timeDiff, "so deleating it!")
+                        await deleteServer(current_instance["name"])
+                    }
+                }
+            })
+        }
+
         if (waitForHost) {
             console.log("waiting for server to start")
 
@@ -315,31 +345,31 @@ const autoScaleServerLoads = async () => {
                     "host_ip": host_ip,
                     "ready": false
                 })
+            } else {
+                console.log("instance creating failed!")
             }
         }
-        setTimeout(async () => {
-            await autoScaleServerLoads()
-        }, process.env.AUTO_SCALE_TIMEOUT || 5000)
-        return
+        skipProcess = true
         //not going further
     }
+    if (!skipProcess) {
+        await calc_session_stats()
 
-    await calc_session_stats()
-
-    let empty_session_hosts = []
-    Object.keys(currentHosts).forEach(host => {
-        host = host.replace("available-hosts/", "")
-        if (process.env.MY_IP && host.indexOf(process.env.MY_IP) !== -1) {
-            console.log("skipping current host", host)
-        } else {
-            if (session_host_tree[host]) {
-                console.log("session active on ", host, Object.key(session_host_tree[host].length))
+        let empty_session_hosts = []
+        Object.keys(currentHosts).forEach(host => {
+            host = host.replace("available-hosts/", "")
+            if (process.env.MY_IP && host.indexOf(process.env.MY_IP) !== -1) {
+                console.log("skipping current host", host)
             } else {
-                console.log("no sessions active on host ", host, " can be deleted!")
-                empty_session_hosts.push(host)
+                if (session_host_tree[host]) {
+                    console.log("session active on ", host, Object.key(session_host_tree[host].length))
+                } else {
+                    console.log("no sessions active on host ", host, " can be deleted!")
+                    empty_session_hosts.push(host)
+                }
             }
-        }
-    })
+        })
+    }
     setTimeout(async () => {
         await autoScaleServerLoads()
     }, process.env.AUTO_SCALE_TIMEOUT || 5000)
