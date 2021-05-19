@@ -25,3 +25,8 @@ Observation
 n1-standard-2  upto 20-30 clients cpu goes 90%
 n1-standard-4  upto 50 clients cpu goes 80%
 n2-standard-4  upto 50 clients cpu goes 70%
+
+
+livestream on dev server with 500 users
+2966745 root      20   0 2178204   1.4g  19232 S 173.7   4.6 128:10.19 sfu       
+so 500 * 4 = 2k users can be handled on dev server itself

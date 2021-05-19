@@ -59,7 +59,7 @@ export const startServer = async (instance_name = "sfu", zone_idx = 0) => {
         }
 
     } else {
-        console.log("cannot start more instances")
+        console.log("cannot start more instances MAX_INSTANCES", MAX_INSTANCES)
     }
 
 }

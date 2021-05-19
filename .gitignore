@@ -8,3 +8,5 @@ ion-sfu
 ion-sfu/*
 ion-sdk-go
 ion-sdk-go/*
+webrtc
+webrtc/*

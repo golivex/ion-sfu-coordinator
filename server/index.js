@@ -194,8 +194,18 @@ const findAndGetHost = async (id, req, res) => {
         })
     }
     if (hostExists) {
-        console.log("session node", sessionNode)
-        res.send(sessionNode.replace("::", ":"))
+
+        const cpu1 = parseFloat(avaiable_hosts[hostExists][0].split("-")[1])
+        console.log("session node", sessionNode, "cpu", cpu1)
+        if (cpu1 > 10 && false) {
+            // there is a problem here. if load goes down, we will let all the waiting processes in. 
+            // this is a problem, we need to let processes one by one...... if load is high
+            // but if load is low we need to let them in fast......
+            // need to think of this how process will get blocked
+            res.send("SERVER_LOAD")
+        } else {
+            res.send(sessionNode.replace("::", ":"))
+        }
     } else {
         // this is a problem here because its possible that we are getting very high requests
         // and even before sfu starts we can give another host to the same session
@@ -346,7 +356,7 @@ const autoScaleServerLoads = async () => {
 
                 const timeDiff = (new Date().getTime() - gcp_hosts_deadmap[host_ip]) / 1000
                 console.log("time diff on dead instance", timeDiff)
-                if (timeDiff > (process.env.GCP_DEAD_HOST_DELETE_WAIT || 5 * 60)) {
+                if (timeDiff > (process.env.GCP_DEAD_HOST_DELETE_WAIT || 1 * 60)) {
                     console.log("instance is dead since", timeDiff, "so deleating it!")
                     await deleteServer(gcp_ip_name_map[host_ip]["name"], gcp_ip_name_map[host_ip]["zone"])
                 }
@@ -418,7 +428,9 @@ const autoScaleServerLoads = async () => {
     if (!skipProcess) {
         await calc_session_stats()
 
-        Object.keys(currentHosts).find(async host => {
+        console.log("checked if we need to close down hosts currentHosts", currentHosts)
+
+        Object.keys(currentHosts).every(async host => {
             if (process.env.MY_IP && host === process.env.MY_IP) {
                 console.log("skipping current host", host)
             } else {
@@ -439,7 +451,7 @@ const autoScaleServerLoads = async () => {
                             if (Object.keys(currentHosts).length > (process.env.MINIMUM_HOSTS || 1)) {
                                 await deleteServer(gcp_ip_name_map[host]["name"], gcp_ip_name_map[host]["zone"])
                                 await new Promise(r => setTimeout(() => { r() }, 10000))
-                                return true //so that it doesn't delete more
+                                return false //so that it doesn't delete more
                             } else {
                                 console.log("cannot delete need atleast one host")
                             }
@@ -451,7 +463,7 @@ const autoScaleServerLoads = async () => {
                 }
             }
 
-            return false
+            return true
         })
     }
     setTimeout(async () => {
