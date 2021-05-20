@@ -1,6 +1,11 @@
 package main
 
-import "github.com/gin-gonic/gin"
+import (
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+	"github.com/manishiitg/actions/mirror-sfu/client"
+)
 
 func main() {
 	r := gin.Default()
@@ -9,6 +14,13 @@ func main() {
 			"message": "pong",
 		})
 	})
-	r.GET("")
-	r.Run(":8080") // listen and serve on 0.0.0.0:8080 (for windows "localhost:8080")
+	r.GET("/syncsfu/:session1/:session2/:addr1", func(c *gin.Context) {
+		go client.Init(c.Param("session1"), c.Param("addr1"), c.Param("session2"), c.Param("addr1"))
+		c.String(http.StatusOK)
+	})
+	r.GET("/syncsfu/:session1/:session2/:addr1/*addr2", func(c *gin.Context) {
+		go client.Init(c.Param("session1"), c.Param("addr1"), c.Param("session2"), c.Param("addr2"))
+		c.String(http.StatusOK)
+	})
+	r.Run(":3050")
 }
