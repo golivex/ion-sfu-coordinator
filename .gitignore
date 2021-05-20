@@ -10,3 +10,5 @@ ion-sdk-go
 ion-sdk-go/*
 webrtc
 webrtc/*
+pion-tools/ion-cluster
+pion-tools/track-to-disk/testwebm

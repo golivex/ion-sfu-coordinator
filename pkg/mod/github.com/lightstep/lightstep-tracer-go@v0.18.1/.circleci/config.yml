@@ -1,0 +1,22 @@
+version: 2
+
+jobs:
+  test:
+    docker:
+      - image: circleci/golang:1.12
+        environment:
+          GO111MODULE: 'on'
+          GOPROXY: https://proxy.golang.org
+    steps:
+      - checkout
+      - run: git submodule sync
+      - run: git submodule update --init
+      - run:
+          command: go test -timeout 20m -race -v ./...
+          no_output_timeout: 20m
+
+workflows:
+  version: 2
+  test:
+    jobs:
+      - test

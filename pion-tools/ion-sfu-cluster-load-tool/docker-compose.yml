@@ -1,0 +1,8 @@
+version: "3.7"
+
+services:
+  load-test:
+    build:
+        context : .
+    command: ["-session", "test2", "-file", "test"]
+    network_mode: host
