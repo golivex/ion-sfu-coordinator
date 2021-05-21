@@ -498,7 +498,7 @@ server.listen(PORT, async function () {
                     const sessions = await client.getAll().prefix('/session/' + session).keys();
                     console.log('deleting all session keys', sessions);
                     await Promise.all(sessions.map(session => {
-                        return new Promise(async (resolve) => {
+                        return new Promise(async resolve => {
                             await client.delete().key(session)
                             resolve()
                         })
@@ -557,9 +557,7 @@ server.listen(PORT, async function () {
                     "data": data
                 })
                 if (avaiable_hosts[host]) {
-
                     //keep maximum 30 records per host
-
                     if (avaiable_hosts[host].length >= 30) {
                         avaiable_hosts[host].pop()
                     }
