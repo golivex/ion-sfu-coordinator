@@ -3,21 +3,16 @@ package client
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	log "github.com/pion/ion-log"
 	sdk "github.com/pion/ion-sdk-go"
+	"github.com/pion/rtcp"
 	"github.com/pion/webrtc/v3"
-	uuid "github.com/satori/go.uuid"
 )
 
-var dcLock sync.RWMutex
-
-type dcMap struct {
-	client *sdk.Client
-	dc     *webrtc.DataChannel
-}
-
-var dataMap = make(map[string]dcMap)
+var lock sync.Mutex
+var tracks = make(map[string]*webrtc.TrackLocalStaticRTP)
 
 func Init(session, addr, session2, addr2 string) {
 	// add stun servers
@@ -42,10 +37,6 @@ func Init(session, addr, session2, addr2 string) {
 
 	// create a new client from engine
 	cid1 := "client1"
-	uuid, err := uuid.NewV4()
-	if err == nil {
-		cid1 = uuid.String()
-	}
 	c1, err := sdk.NewClient(e, addr, cid1)
 	if err != nil {
 		log.Errorf("err=%v", err)
@@ -53,63 +44,20 @@ func Init(session, addr, session2, addr2 string) {
 	}
 
 	cid2 := "client1"
-	uuid, err = uuid.NewV4()
-	if err == nil {
-		cid2 = uuid.String()
-	}
 	c2, err := sdk.NewClient(e, addr2, cid2)
 	if err != nil {
 		log.Errorf("err=%v", err)
 		return
 	}
 
-	notify := make(chan string)
-
-	c1.OnClose = func() {
-		notify <- "closed"
-	}
+	done := make(chan bool)
 
 	c1.OnDataChannel = func(dc *webrtc.DataChannel) {
-		log.Warnf("New DataChannel %s %d\n", dc.Label())
-		dcID := fmt.Sprintf("dc %v", dc.Label())
-		log.Warnf("DCID %v", dcID)
-		client, err := sdk.NewClient(e, addr, dcID)
-		if err != nil {
-			log.Errorf("err=%v", err)
-			return
-		}
-		dcLock.Lock()
-		client.Join(session2)
-		dcc, err := client.CreateDataChannel(dc.Label())
-		dcc.OnMessage(func(msg webrtc.DataChannelMessage) {
-			// bi-directional data channels
-			log.Warnf("back msg %v", string(msg.Data))
-			dc.SendText(string(msg.Data))
-		})
-		if err != nil {
-			panic(err)
-		}
-		dataMap[dcID] = dcMap{
-			client: client,
-			dc:     dcc,
-		}
-		dcLock.Unlock()
-		dc.OnClose(func() {
-			dcLock.Lock()
-			defer dcLock.Unlock()
-			dcID := fmt.Sprintf("closing data channel dc %v", dc.Label())
-			dataMap[dcID].dc.Close()
-			dataMap[dcID].client.Close()
-			delete(dataMap, dcID)
-		})
-		dc.OnMessage(func(msg webrtc.DataChannelMessage) {
-			log.Warnf("Message from DataChannel %v %v", dc.Label(), string(msg.Data))
-			dcLock.Lock()
-			defer dcLock.Unlock()
-			dcID := fmt.Sprintf("dc %v", dc.Label())
-			dataMap[dcID].dc.SendText(string(msg.Data))
-		})
+		go dctodc(dc, c2)
 	}
+	// c2.OnDataChannel = func(dc *webrtc.DataChannel) {
+	// 	go dctodc(dc, c1)
+	// }
 	c1.OnTrack = func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
 		go tracktotrack(track, receiver, c2)
 	}
@@ -130,10 +78,48 @@ func Init(session, addr, session2, addr2 string) {
 		return
 	}
 	fmt.Println("c2 joined")
+	fmt.Println("mirroring now")
+	ticker := time.NewTicker(time.Minute)
+	for {
+		select {
+		case <-done:
+			fmt.Println("mirror finished session %v addr1 %v session2 %v addr2 %v", session, addr, session2, addr2)
+			return
+		case <-ticker.C:
+			lock.Lock()
+			no := len(tracks)
+			lock.Unlock()
+			if no == 0 {
+				fmt.Println("no tracks found closing")
+				close(done)
+			} else {
+				// fmt.Println("tracks found! ", no)
+			}
 
-	<-notify
-	fmt.Println("mirror finished session %v addr1 %v session2 %v addr2 %v", session, addr, session2, addr2)
+		}
+	}
+}
 
+func dctodc(dc *webrtc.DataChannel, c2 *sdk.Client) {
+	log.Warnf("New DataChannel %s %d\n", dc.Label())
+	dcID := fmt.Sprintf("dc %v", dc.Label())
+	log.Warnf("DCID %v", dcID)
+	dc2, err := c2.CreateDataChannel(dc.Label())
+	if err != nil {
+		return
+	}
+	dc.OnClose(func() {
+		dc2.Close()
+	})
+	dc.OnMessage(func(msg webrtc.DataChannelMessage) {
+		log.Warnf("Message from DataChannel %v %v", dc.Label(), string(msg.Data))
+		dc2.SendText(string(msg.Data))
+	})
+	dc2.OnMessage(func(msg webrtc.DataChannelMessage) {
+		// bi-directional data channels
+		log.Warnf("back msg %v", string(msg.Data))
+		dc.SendText(string(msg.Data))
+	})
 }
 
 func tracktotrack(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver, c2 *sdk.Client) {
@@ -142,6 +128,9 @@ func tracktotrack(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver, c2 *s
 	if err != nil {
 		panic(err)
 	}
+	lock.Lock()
+	tracks[track.ID()] = newTrack
+	lock.Unlock()
 
 	t, err := c2.Publish(newTrack)
 	if err != nil {
@@ -149,6 +138,21 @@ func tracktotrack(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver, c2 *s
 		return
 	}
 	defer c2.UnPublish(t)
+	defer func() {
+		lock.Lock()
+		delete(tracks, track.ID())
+		lock.Unlock()
+	}()
+
+	go func() {
+		ticker := time.NewTicker(time.Second * 2)
+		for range ticker.C {
+			rtcpSendErr := c2.GetSubTransport().GetPeerConnection().WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(track.SSRC())}})
+			if rtcpSendErr != nil {
+				fmt.Println(rtcpSendErr)
+			}
+		}
+	}()
 
 	for {
 		// Read

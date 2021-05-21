@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 
 	"github.com/manishiitg/actions/mirror-sfu/client"
 	log "github.com/pion/ion-log"
@@ -21,7 +20,5 @@ func main() {
 	flag.StringVar(&session2, "session2", "test2", "join session name")
 	flag.Parse()
 
-	client.Init(addr, session, addr2, session2)
-	fmt.Println("waiting")
-	select {}
+	client.Init(session, addr, session2, addr2)
 }
