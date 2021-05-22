@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -16,7 +17,14 @@ import (
 	"github.com/pion/webrtc/v3"
 )
 
+type HostResponse struct {
+	Host string
+}
+
 func get_host(addr string, new_session string, notify chan string) {
+
+	// notify <- "0.0.0.0:50052"
+
 	resp, err := http.Get(addr + "session/" + new_session)
 	if err != nil {
 		log.Errorf("%v", err)
@@ -29,7 +37,10 @@ func get_host(addr string, new_session string, notify chan string) {
 		time.Sleep(10 * time.Second)
 		get_host(addr, new_session, notify)
 	}
-	sfu_host := string(body)
+	var response HostResponse
+	err = json.Unmarshal(body, &response)
+	panic(err)
+	sfu_host := response.Host
 	if sfu_host == "NO_HOSTS_RETRY" {
 		fmt.Println("waiting for host to get ready!")
 		time.Sleep(2 * time.Second)
@@ -109,6 +120,7 @@ func run(e *sdk.Engine, addr, session, file, role string, total, duration, cycle
 	select {
 	case <-timer.C:
 	}
+
 }
 
 func clientThread() {

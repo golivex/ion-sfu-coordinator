@@ -1,12 +1,21 @@
 package main
 
 import (
-	services "github.com/golivex/sfu-coordinator/services"
+	"context"
+
+	coordinator "github.com/golivex/sfu-coordinator/services"
 )
 
 func main() {
-	etcd := services.NewCoordinatorEtcd("0.0.0.0:2379")
+	ctx, cancel := context.WithCancel(context.Background())
+	etcd := coordinator.NewCoordinatorEtcd("0.0.0.0:2379")
+	etcd.LoadSessions()
+	etcd.LoadHosts()
+	go etcd.WatchHosts(ctx)
+	go etcd.WatchSessions(ctx)
+
+	defer cancel()
 	defer etcd.Close()
-	etcd.WatchHosts()
-	select {}
+	etcd.InitApi()
+
 }
