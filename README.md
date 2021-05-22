@@ -42,6 +42,7 @@ need to wait for B to start session and then allocate users to B
 
 but how to allocate users as max load is 2 and have multiple income requests. if we allow more than sfu might crash
 .....
+this would mean we need to apply locks and can allocate hosts one at a time and not parallely
 
 
 

@@ -8,10 +8,12 @@ require (
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/json-iterator/go v1.1.11 // indirect
 	github.com/leodido/go-urn v1.2.1 // indirect
+	github.com/lucsky/cuid v1.0.2 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.1 // indirect
 	github.com/pion/ion-log v1.1.0 // indirect
 	github.com/pion/ion-sdk-go v0.5.0 // indirect
+	github.com/pion/ion-sfu v1.9.4-0.20210304193051-6b6be58a1c9b // indirect
 	github.com/pion/rtcp v1.2.6 // indirect
 	github.com/pion/rtp v1.6.5 // indirect
 	github.com/pion/webrtc/v3 v3.0.29 // indirect

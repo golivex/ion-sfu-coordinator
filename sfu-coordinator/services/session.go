@@ -85,7 +85,7 @@ func (e *etcdCoordinator) removeSession(sessionstr string) {
 					}
 				} else {
 					fmt.Println(sessionstr)
-					panic("peer not found")
+					// panic("peer not found")
 				}
 
 			} else {
@@ -97,6 +97,24 @@ func (e *etcdCoordinator) removeSession(sessionstr string) {
 				fmt.Println("removing peer %v", p)
 				livesession := e.sessions[key]
 				livesession.Peers = append(livesession.Peers[:foundidx], livesession.Peers[foundidx+1:]...)
+
+				audioTracks := 0
+				videoTracks := 0
+				for _, peer := range livesession.Peers {
+					for _, track := range peer.Tracks {
+						if track.Kind == "audio" {
+							audioTracks = audioTracks + 1
+						}
+						if track.Kind == "video" {
+							videoTracks = videoTracks + 1
+						}
+					}
+
+				}
+
+				livesession.AudioTracks = audioTracks
+				livesession.VideoTracks = videoTracks
+				livesession.PeerCount = len(livesession.Peers)
 				e.sessions[key] = livesession
 			}
 		}
@@ -262,7 +280,7 @@ func (e *etcdCoordinator) LoadSessions() {
 	for _, ev := range resp.Kvs {
 		// fmt.Printf("%s : %s\n", ev.Key, ev.Value)
 		sessionstr := string(ev.Key[:])
-		fmt.Println("session str %v", sessionstr)
+		fmt.Println("load session str %v", sessionstr)
 		e.generateSessionTree(sessionstr)
 	}
 }

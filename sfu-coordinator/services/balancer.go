@@ -42,16 +42,35 @@ func (e *etcdCoordinator) FindHost(session string, isaction bool) HostReply {
 		}
 	}
 
-	if isaction {
-		if sfu.IsScaledSession(session) {
-			hostip := sfu.GetSessionHost(session)
-			if !hostip.Empty() {
-				log.Infof("empty scaled host")
-				return HostReply{
-					Host:   hostip.String(),
-					Status: HOST_SCALED_SESSION_FROM_ACTION,
-				}
+	sfu.SyncHost(e)
+
+	if sfu.IsScaledSession(session) {
+		hostip := sfu.GetSessionHost(session)
+		if !hostip.Empty() {
+			// if isaction { //TODO rethink this maybe mirror should not use coordinator
+			// 	log.Infof("empty scaled host")
+			// 	return HostReply{
+			// 		Host:   hostip.String(),
+			// 		Status: HOST_SCALED_SESSION_FROM_ACTION,
+			// 	}
+			// }
+		}
+
+		// here we should find all the hosts which the scaled host has
+		// and see which host has avaiblity?
+		// but what if there is no host which is avaiable or we have started a new host its not started yet?
+
+		host := sfu.FindOptmialHost(session, e)
+		if !host.Empty() {
+			return HostReply{
+				Host:   host.String(),
+				Status: "SCALED_HOST_OPTIMAL",
 			}
+		} else {
+			return HostReply{
+				Status: "SCALED_HOST_NOT_FOUND",
+			}
+			//TODO Scale more
 		}
 	}
 
@@ -79,12 +98,10 @@ func (e *etcdCoordinator) FindHost(session string, isaction bool) HostReply {
 			//need to scale sfu on this host first
 			if status == HOST_SESSION_EXISTS {
 
-				nsession := sfu.AssignHostToSession(session, nhost)
-
-				go MirrorSfu(session, nsession, host.Ip)
-
+				nsession := sfu.AssignHostToSession(session, nhost, host)
+				go MirrorSfu(session, nsession, host, nhost)
 				return HostReply{
-					Host:   nhost.String(),
+					// Host:   nhost.String(),
 					Status: HOST_SCALING,
 				}
 			} else {
@@ -103,7 +120,7 @@ func (e *etcdCoordinator) FindHost(session string, isaction bool) HostReply {
 }
 
 func (e *etcdCoordinator) canHostServe(host Host) bool {
-	log.Infof("(host.AudioTracks + host.VideoTracks) %v host %v", (host.AudioTracks + host.VideoTracks), host)
+	log.Infof("(host.AudioTracks + host.VideoTracks) %v host %v", (host.AudioTracks + host.VideoTracks), host.String())
 	if (host.AudioTracks + host.VideoTracks) >= MAX_TRACKS_PER_HOST {
 		return false
 	} else {

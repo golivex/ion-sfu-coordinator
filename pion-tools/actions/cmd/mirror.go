@@ -20,5 +20,6 @@ func main() {
 	flag.StringVar(&session2, "session2", "test2", "join session name")
 	flag.Parse()
 
-	client.InitWithAddress(session, session2, addr, addr2)
+	cancel := make(chan int)
+	client.InitWithAddress(session, session2, addr, addr2, cancel)
 }

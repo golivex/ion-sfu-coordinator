@@ -32,8 +32,24 @@ func (e *etcdCoordinator) InitApi() {
 		host := e.FindHost(id, len(isaction) > 0)
 		c.JSON(200, host)
 	})
+	r.GET("/stopload", func(c *gin.Context) {
+		go StopSimLoad("0.0.0.0")
+		c.Status(http.StatusOK)
+	})
+	r.GET("/stopload/:host", func(c *gin.Context) {
+		go StopSimLoad(c.Param("host"))
+		c.Status(http.StatusOK)
+	})
+	r.GET("/load/:session", func(c *gin.Context) {
+		go SimLoad(c.Param("session"), "0.0.0.0")
+		c.Status(http.StatusOK)
+	})
+	r.GET("/load/:session/:host", func(c *gin.Context) {
+		go SimLoad(c.Param("session"), c.Param("host"))
+		c.Status(http.StatusOK)
+	})
 	// /session/test/node/5.9.18.28:7002/peer/ckoy35usg00080110qpo13b3v
-	r.GET("/simulatedel", func(c *gin.Context) {
+	r.GET("/clearsession", func(c *gin.Context) {
 		e.cli.Delete(context.Background(), "/session/", clientv3.WithPrefix())
 	})
 	r.GET("/simulate/session/:id/:host/:port", func(c *gin.Context) {

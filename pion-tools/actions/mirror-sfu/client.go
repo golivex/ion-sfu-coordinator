@@ -2,6 +2,7 @@ package mirrorsfu
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,8 +16,10 @@ import (
 var lock sync.Mutex
 var tracks = make(map[string]*webrtc.TrackLocalStaticRTP)
 
-func InitWithAddress(session, session2, addr, addr2 string) {
+func InitWithAddress(session, session2, addr, addr2 string, cancel chan struct{}) {
 	// add stun servers
+	addr = strings.Replace(addr, "700", "5005", -1)   //TODO Find a better way for this
+	addr2 = strings.Replace(addr2, "700", "5005", -1) //TODO Find a better way for this
 	webrtcCfg := webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			webrtc.ICEServer{
@@ -71,14 +74,14 @@ func InitWithAddress(session, session2, addr, addr2 string) {
 		log.Errorf("err=%v", err)
 		return
 	}
-	fmt.Println("c1 joined")
+	fmt.Println("c1 joined %v", addr)
 
 	err = c2.Join(session2)
 	if err != nil {
 		log.Errorf("err=%v", err)
 		return
 	}
-	fmt.Println("c2 joined")
+	fmt.Println("c2 joined %v", addr2)
 	fmt.Println("mirroring now")
 	ticker := time.NewTicker(time.Minute)
 	for {
@@ -101,15 +104,15 @@ func InitWithAddress(session, session2, addr, addr2 string) {
 	}
 }
 
-func Init(session, session2 string) {
-	notify := make(chan string)                                      //TODO this pattern doesn't seem proper use context with cancel etc
-	go connection.GetHost("http://5.9.18.28:4000/", session, notify) //TODO hard coded host
+func Init(session, session2 string, cancel chan struct{}) {
+	notify := make(chan string)                                              //TODO this pattern doesn't seem proper use context with cancel etc
+	go connection.GetHost("http://5.9.18.28:4000/", session, notify, cancel) //TODO hard coded host
 	sfu_host := <-notify
 
 	notify2 := make(chan string)
-	go connection.GetHost("http://5.9.18.28:4000/", session2, notify2)
+	go connection.GetHost("http://5.9.18.28:4000/", session2, notify2, cancel)
 	sfu_host2 := <-notify2
-	InitWithAddress(session, session2, sfu_host, sfu_host2)
+	InitWithAddress(session, session2, sfu_host, sfu_host2, cancel)
 }
 
 func dctodc(dc *webrtc.DataChannel, c2 *sdk.Client) {

@@ -2,10 +2,16 @@ package main
 
 import (
 	"net/http"
+	"sync"
 
 	"github.com/gin-gonic/gin"
+	loadtest "github.com/manishiitg/actions/loadtest"
 	mirrorsfu "github.com/manishiitg/actions/mirror-sfu"
 )
+
+var mu sync.Mutex
+var loadTestCancel = [](chan struct{}){}
+var mirrorCancel = [](chan struct{}){}
 
 func main() {
 	r := gin.Default()
@@ -17,13 +23,48 @@ func main() {
 			"message": "pong",
 		})
 	})
+	r.GET("/stopsyncsfu", func(c *gin.Context) {
+		mu.Lock()
+		defer mu.Unlock()
+		for _, cancel := range mirrorCancel {
+			close(cancel)
+		}
+		mirrorCancel = [](chan struct{}){}
+	})
 	r.GET("/syncsfu/:session1/:session2", func(c *gin.Context) {
-		go mirrorsfu.Init(c.Param("session1"), c.Param("session2"))
+		mu.Lock()
+		defer mu.Unlock()
+		cancel := make(chan struct{})
+		go mirrorsfu.Init(c.Param("session1"), c.Param("session2"), cancel)
+		mirrorCancel = append(mirrorCancel, cancel)
 		c.Status(http.StatusOK)
 	})
 	r.GET("/syncsfu/:session1/:session2/:addr1/:addr2", func(c *gin.Context) {
-		go mirrorsfu.InitWithAddress(c.Param("session1"), c.Param("session2"), c.Param("addr1"), c.Param("addr2"))
+		mu.Lock()
+		defer mu.Unlock()
+		cancel := make(chan struct{})
+		go mirrorsfu.InitWithAddress(c.Param("session1"), c.Param("session2"), c.Param("addr1"), c.Param("addr2"), cancel)
+		mirrorCancel = append(mirrorCancel, cancel)
 		c.Status(http.StatusOK)
 	})
+
+	r.GET("/stopload", func(c *gin.Context) {
+		mu.Lock()
+		defer mu.Unlock()
+		for _, cancel := range loadTestCancel {
+			close(cancel)
+		}
+		loadTestCancel = [](chan struct{}){}
+
+	})
+	r.GET("/load/:session1", func(c *gin.Context) {
+		mu.Lock()
+		defer mu.Unlock()
+		cancel := make(chan struct{})
+		go loadtest.InitApi(c.Param("session1"), cancel)
+		loadTestCancel = append(loadTestCancel, cancel)
+		c.Status(http.StatusOK)
+	})
+
 	r.Run(":3050")
 }
