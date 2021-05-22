@@ -104,8 +104,8 @@ func (e *etcdCoordinator) removeSession(sessionstr string) {
 	} else {
 		delete(e.sessions, key)
 	}
-	e.debugSession()
 	e.updateHostSessions()
+	e.debugSession()
 }
 
 func (e *etcdCoordinator) generateSessionTree(sessionstr string) {
@@ -211,8 +211,8 @@ func (e *etcdCoordinator) generateSessionTree(sessionstr string) {
 
 		e.sessions[key] = livesession
 	}
-	e.debugSession()
 	e.updateHostSessions()
+	e.debugSession()
 }
 
 func (e *etcdCoordinator) updateHostSessions() {
@@ -221,8 +221,8 @@ func (e *etcdCoordinator) updateHostSessions() {
 		host.VideoTracks = 0
 		host.PeerCount = 0
 		for _, live := range e.sessions {
-			// log.Infof("host.Ip %v live.Host %v host.Port %v live.Port %v", host.Ip, live.Host, host.Port, live.Port)
 			if host.Ip == live.Host && host.Port == live.Port {
+				// log.Infof("host.Ip %v live.Host %v host.Port %v live.Port %v live %v", host.Ip, live.Host, host.Port, live.Port, live)
 				host.AudioTracks = host.AudioTracks + live.AudioTracks
 				host.VideoTracks = host.VideoTracks + live.VideoTracks
 				host.PeerCount = host.PeerCount + live.PeerCount

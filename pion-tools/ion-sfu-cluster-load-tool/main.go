@@ -39,7 +39,9 @@ func get_host(addr string, new_session string, notify chan string) {
 	}
 	var response HostResponse
 	err = json.Unmarshal(body, &response)
-	panic(err)
+	if err == nil {
+		panic(err)
+	}
 	sfu_host := response.Host
 	if sfu_host == "NO_HOSTS_RETRY" {
 		fmt.Println("waiting for host to get ready!")

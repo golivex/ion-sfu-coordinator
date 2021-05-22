@@ -20,5 +20,5 @@ func main() {
 	flag.StringVar(&session2, "session2", "test2", "join session name")
 	flag.Parse()
 
-	client.Init(session, addr, session2, addr2)
+	client.InitWithAddress(session, session2, addr, addr2)
 }

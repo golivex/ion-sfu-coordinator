@@ -25,6 +25,26 @@ the node in which we can start a new session
 5) in live stream, if we are doing live stream or recording etc we will start a new instance only for this purpose always
 
 
+How To Scale Thoughts
+======================
+
+Lets say we have sfu A, B, C, D and every sfu can take a load of 2 tracks only
+
+diffent cases that can happen
+
+a) we have lot of incoming requests together on the cluster
+
+A -> 2
+
+then A needs to start mirror from A -> B
+
+need to wait for B to start session and then allocate users to B
+
+but how to allocate users as max load is 2 and have multiple income requests. if we allow more than sfu might crash
+.....
+
+
+
 Observation
 ==============
 

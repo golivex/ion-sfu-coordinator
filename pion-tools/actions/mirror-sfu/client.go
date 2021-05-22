@@ -1,10 +1,11 @@
-package client
+package mirrorsfu
 
 import (
 	"fmt"
 	"sync"
 	"time"
 
+	connection "github.com/manishiitg/actions/connection"
 	log "github.com/pion/ion-log"
 	sdk "github.com/pion/ion-sdk-go"
 	"github.com/pion/rtcp"
@@ -14,7 +15,7 @@ import (
 var lock sync.Mutex
 var tracks = make(map[string]*webrtc.TrackLocalStaticRTP)
 
-func Init(session, addr, session2, addr2 string) {
+func InitWithAddress(session, session2, addr, addr2 string) {
 	// add stun servers
 	webrtcCfg := webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
@@ -98,6 +99,17 @@ func Init(session, addr, session2, addr2 string) {
 
 		}
 	}
+}
+
+func Init(session, session2 string) {
+	notify := make(chan string)                                      //TODO this pattern doesn't seem proper use context with cancel etc
+	go connection.GetHost("http://5.9.18.28:4000/", session, notify) //TODO hard coded host
+	sfu_host := <-notify
+
+	notify2 := make(chan string)
+	go connection.GetHost("http://5.9.18.28:4000/", session2, notify2)
+	sfu_host2 := <-notify2
+	InitWithAddress(session, session2, sfu_host, sfu_host2)
 }
 
 func dctodc(dc *webrtc.DataChannel, c2 *sdk.Client) {
