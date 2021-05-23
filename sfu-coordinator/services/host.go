@@ -12,6 +12,22 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
+func (h *Host) String() string {
+	return h.Ip + ":" + h.Port
+}
+func (h *Host) Empty() bool {
+	return h.Ip == ""
+}
+
+func (h *Host) GetCurrentLoad() float64 {
+	loads := h.Loads
+	if len(loads) == 0 {
+		return float64(100)
+	}
+	lastload := loads[len(loads)-1]
+	return lastload.Cpu
+}
+
 type HostPing struct {
 	Ip   string  `json:"ip"`
 	Port string  `json:"port"`
@@ -38,6 +54,7 @@ func (e *etcdCoordinator) addHost(key string, loadStr []byte) {
 			Ip:    hostping.Ip,
 			Port:  hostping.Port,
 			Loads: []Load{},
+			Spike: []Spike{},
 		}
 		host.Loads = append(host.Loads, l)
 		e.hosts[key] = host
@@ -93,7 +110,7 @@ func (e *etcdCoordinator) WatchHosts(ctx context.Context) {
 				e.deleteHost(ip)
 
 			}
-			// log.Infof("%s %q : %q\n", ev.Type, ev.Kv.Key, ev.Kv.Value)
+			// log.Infof(" watch host %s %q : %q\n", ev.Type, ev.Kv.Key, ev.Kv.Value)
 			// log.Infof("hosts %v", e.hosts)
 		}
 	}

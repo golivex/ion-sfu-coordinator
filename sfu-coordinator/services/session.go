@@ -2,6 +2,7 @@ package coordinator
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -233,6 +234,51 @@ func (e *etcdCoordinator) generateSessionTree(sessionstr string) {
 	e.debugSession()
 }
 
+func (e *etcdCoordinator) updateSessionMap(stats map[string][]string, node string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	for sessionkey, live := range e.sessions {
+		if live.Host+":"+live.Port == node {
+			log.Infof("looking at node %v", node)
+
+			sessionfound := false
+			for key, _ := range stats {
+				if live.Name == key {
+					sessionfound = true
+					log.Infof("%v session found in host looking for peers", sessionkey)
+					var newPeers = []Peer{}
+					for _, peer := range live.Peers {
+						peerfound := false
+						for _, rp := range stats[key] {
+							if rp == peer.Id {
+								peerfound = true
+								break
+							}
+						}
+						if peerfound {
+							newPeers = append(newPeers, peer)
+						} else {
+							log.Infof("removing peer! %v", peer.Id)
+						}
+					}
+					live.Peers = newPeers
+					e.sessions[sessionkey] = live
+					break
+				}
+			}
+
+			if !sessionfound {
+				log.Infof("%v session not found in host, removing it!!!!", sessionkey)
+				delete(e.sessions, sessionkey)
+			}
+
+		}
+	}
+
+	e.updateHostSessions()
+	e.debugSession()
+}
+
 func (e *etcdCoordinator) updateHostSessions() {
 	for hostkey, host := range e.hosts {
 		host.AudioTracks = 0
@@ -253,7 +299,7 @@ func (e *etcdCoordinator) updateHostSessions() {
 }
 
 func (e *etcdCoordinator) debugSession() {
-	fmt.Println("=================================")
+	fmt.Println("==============SESSIONS===================")
 	for _, live := range e.sessions {
 		fmt.Println(fmt.Sprintf("======== session:%v host:%v port:%v ========", live.Name, live.Host, live.Port))
 		fmt.Println(fmt.Sprintf("======== peer count:%v audioTracks:%v videoTracks %v ========", live.PeerCount, live.AudioTracks, live.VideoTracks))
@@ -265,6 +311,13 @@ func (e *etcdCoordinator) debugSession() {
 		}
 	}
 
+	fmt.Println("=================================")
+	fmt.Println("==============HOSTS===================")
+
+	for _, host := range e.hosts {
+		fmt.Println(fmt.Sprintf("======== host:%v ========", host.String()))
+		fmt.Println(fmt.Sprintf("======== peer %v atracks:%v vtracks:%v ========", host.PeerCount, host.AudioTracks, host.VideoTracks))
+	}
 	fmt.Println()
 	fmt.Println()
 	fmt.Println()
@@ -282,6 +335,26 @@ func (e *etcdCoordinator) LoadSessions() {
 		sessionstr := string(ev.Key[:])
 		fmt.Println("load session str %v", sessionstr)
 		e.generateSessionTree(sessionstr)
+	}
+}
+
+func (e *etcdCoordinator) WatchCurrentSessionMap(ctx context.Context) {
+	rch := e.cli.Watch(ctx, "/current_session_map/", clientv3.WithPrefix())
+	for wresp := range rch {
+		for _, ev := range wresp.Events {
+			// log.Infof("%s %q : %q\n", ev.Type, ev.Kv.Key, ev.Kv.Value)
+			// /session/test/node/5.9.18.28:7002/peer/ckoy35usg00080110qpo13b3v
+			sessionstr := string(ev.Kv.Key[:])
+			var stats = make(map[string][]string)
+			json.Unmarshal(ev.Kv.Value, &stats)
+			node := strings.Split(sessionstr, "/")[3]
+			log.Infof("%v current_session_map str %v %v %v", ev.Type, sessionstr, stats, node)
+			if ev.Type == mvccpb.PUT {
+				e.updateSessionMap(stats, node)
+			}
+			if ev.Type == mvccpb.DELETE {
+			}
+		}
 	}
 }
 

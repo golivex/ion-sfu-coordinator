@@ -14,6 +14,7 @@ import (
 	"sync"
 	"unsafe"
 
+	log "github.com/pion/ion-log"
 	"github.com/pion/rtcp"
 	"github.com/pion/webrtc/v3"
 )
@@ -70,7 +71,7 @@ func (c *CompositorPipeline) AddInputTrack(t *webrtc.TrackRemote, pc *webrtc.Pee
 		panic(fmt.Sprintf("couldn't build gst pipeline for codec: %s ", t.Codec().MimeType))
 	}
 
-	log.Info("adding input track", "bin", inputBin)
+	log.Infof("adding input track", "bin", inputBin)
 	inputBinUnsafe := C.CString(inputBin)
 	// defer C.free(unsafe.Pointer(&inputBinUnsafe))
 	trackIdUnsafe := C.CString(t.ID())
@@ -82,7 +83,7 @@ func (c *CompositorPipeline) AddInputTrack(t *webrtc.TrackRemote, pc *webrtc.Pee
 
 	if t.Kind() == webrtc.RTPCodecTypeVideo {
 		boundRemoteTrackKeyframeCallbacks[t.ID()] = func() {
-			log.Info("sending pli for track", "id", t.ID())
+			log.Infof("sending pli for track", "id", t.ID())
 			rtcpSendErr := pc.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(t.SSRC())}})
 			if rtcpSendErr != nil {
 				fmt.Println(rtcpSendErr)
@@ -114,7 +115,7 @@ func (c *CompositorPipeline) bindTrackToAppsrc(t *webrtc.TrackRemote) {
 	for {
 		i, _, readErr := t.Read(buf)
 		if readErr != nil {
-			log.Info("end of track, cleaning up pipeline", "id", t.ID())
+			log.Infof("end of track, cleaning up pipeline", "id", t.ID())
 
 			trackBin := c.trackBins[t.ID()]
 			C.gstreamer_compositor_remove_input_track(c.Pipeline, trackBin, C.bool(t.Kind() == webrtc.RTPCodecTypeVideo))
@@ -139,7 +140,7 @@ func (c *CompositorPipeline) pushAppsrc(buffer []byte, appsrc string) {
 //export goHandleAppsrcForceKeyUnit
 func goHandleAppsrcForceKeyUnit(remoteTrackID *C.char) {
 	id := C.GoString(remoteTrackID)
-	log.Info("go forceKeyUnit for track", "id", id)
+	log.Infof("go forceKeyUnit for track", "id", id)
 	if trackSendPLI, ok := boundRemoteTrackKeyframeCallbacks[id]; ok {
 		trackSendPLI()
 	}

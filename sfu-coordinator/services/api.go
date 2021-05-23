@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -28,6 +29,12 @@ func (e *etcdCoordinator) InitApi() {
 	})
 	r.GET("/session/:id", func(c *gin.Context) {
 		id := c.Param("id") //session name
+		if id == "" {
+			c.JSON(http.StatusOK, gin.H{
+				// "Host": "", TODO
+			})
+			return
+		}
 		isaction := c.Query("action")
 		host := e.FindHost(id, len(isaction) > 0)
 		c.JSON(200, host)
@@ -41,11 +48,31 @@ func (e *etcdCoordinator) InitApi() {
 		c.Status(http.StatusOK)
 	})
 	r.GET("/load/:session", func(c *gin.Context) {
-		go SimLoad(c.Param("session"), "0.0.0.0")
+		clients := c.Query("clients")
+		no := 1
+		if clients != "" {
+			x, err := strconv.Atoi(clients)
+			if err != nil {
+				log.Errorf("error string to int ", err)
+			} else {
+				no = x
+			}
+		}
+		go SimLoad(c.Param("session"), "0.0.0.0", no)
 		c.Status(http.StatusOK)
 	})
 	r.GET("/load/:session/:host", func(c *gin.Context) {
-		go SimLoad(c.Param("session"), c.Param("host"))
+		clients := c.Query("clients")
+		no := 1
+		if clients != "" {
+			x, err := strconv.Atoi(clients)
+			if err != nil {
+				log.Errorf("error string to int ", err)
+			} else {
+				no = x
+			}
+		}
+		go SimLoad(c.Param("session"), c.Param("host"), no)
 		c.Status(http.StatusOK)
 	})
 	// /session/test/node/5.9.18.28:7002/peer/ckoy35usg00080110qpo13b3v

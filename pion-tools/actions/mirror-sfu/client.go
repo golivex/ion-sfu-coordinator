@@ -2,6 +2,7 @@ package mirrorsfu
 
 import (
 	"fmt"
+	"math/rand"
 	"strings"
 	"sync"
 	"time"
@@ -18,6 +19,7 @@ var tracks = make(map[string]*webrtc.TrackLocalStaticRTP)
 
 func InitWithAddress(session, session2, addr, addr2 string, cancel chan struct{}) {
 	// add stun servers
+	log.Warnf("InitWithAddress")
 	addr = strings.Replace(addr, "700", "5005", -1)   //TODO Find a better way for this
 	addr2 = strings.Replace(addr2, "700", "5005", -1) //TODO Find a better way for this
 	webrtcCfg := webrtc.Configuration{
@@ -29,32 +31,29 @@ func InitWithAddress(session, session2, addr, addr2 string, cancel chan struct{}
 	}
 
 	config := sdk.Config{
-		Log: log.Config{
-			Level: "warn",
-		},
 		WebRTC: sdk.WebRTCTransportConfig{
 			Configuration: webrtcCfg,
 		},
 	}
 	// new sdk engine
 	e := sdk.NewEngine(config)
-
 	// create a new client from engine
-	cid1 := "client1"
+	uniq := rand.Intn(1000000)
+	cid1 := fmt.Sprintf("client-mirror-%v", uniq)
 	c1, err := sdk.NewClient(e, addr, cid1)
 	if err != nil {
 		log.Errorf("err=%v", err)
 		return
 	}
 
-	cid2 := "client1"
+	cid2 := fmt.Sprintf("client-mirror-%v", uniq)
 	c2, err := sdk.NewClient(e, addr2, cid2)
 	if err != nil {
 		log.Errorf("err=%v", err)
 		return
 	}
 
-	done := make(chan bool)
+	done := make(chan struct{})
 
 	c1.OnDataChannel = func(dc *webrtc.DataChannel) {
 		go dctodc(dc, c2)
@@ -63,38 +62,41 @@ func InitWithAddress(session, session2, addr, addr2 string, cancel chan struct{}
 	// 	go dctodc(dc, c1)
 	// }
 	c1.OnTrack = func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
-		go tracktotrack(track, receiver, c2)
+		go tracktotrack(track, receiver, c2, done)
 	}
 	c2.OnTrack = func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
-		go tracktotrack(track, receiver, c1)
+		go tracktotrack(track, receiver, c1, done)
 	}
 
-	err = c1.Join(session)
+	err = c1.Join(session, nil)
+	defer e.DelClient(c1)
 	if err != nil {
 		log.Errorf("err=%v", err)
 		return
 	}
-	fmt.Println("c1 joined %v", addr)
+	log.Warnf("c1 joined %v", addr)
 
-	err = c2.Join(session2)
+	err = c2.Join(session2, nil)
+	defer e.DelClient(c1)
 	if err != nil {
 		log.Errorf("err=%v", err)
 		return
 	}
-	fmt.Println("c2 joined %v", addr2)
-	fmt.Println("mirroring now")
-	ticker := time.NewTicker(time.Minute)
+	log.Warnf("c2 joined %v", addr2)
+	log.Warnf("mirroring now")
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-done:
-			fmt.Println("mirror finished session %v addr1 %v session2 %v addr2 %v", session, addr, session2, addr2)
+			log.Warnf("mirror finished session %v addr1 %v session2 %v addr2 %v", session, addr, session2, addr2)
 			return
 		case <-ticker.C:
 			lock.Lock()
 			no := len(tracks)
 			lock.Unlock()
 			if no == 0 {
-				fmt.Println("no tracks found closing")
+				log.Warnf("no tracks found closing")
 				close(done)
 			} else {
 				// fmt.Println("tracks found! ", no)
@@ -108,10 +110,18 @@ func Init(session, session2 string, cancel chan struct{}) {
 	notify := make(chan string)                                              //TODO this pattern doesn't seem proper use context with cancel etc
 	go connection.GetHost("http://5.9.18.28:4000/", session, notify, cancel) //TODO hard coded host
 	sfu_host := <-notify
+	if strings.Index(sfu_host, "=") != -1 {
+		session = strings.Split(sfu_host, "=")[1]
+		sfu_host = strings.Split(sfu_host, "=")[0]
+	}
 
 	notify2 := make(chan string)
 	go connection.GetHost("http://5.9.18.28:4000/", session2, notify2, cancel)
 	sfu_host2 := <-notify2
+	if strings.Index(sfu_host2, "=") != -1 {
+		session2 = strings.Split(sfu_host2, "=")[1]
+		sfu_host2 = strings.Split(sfu_host2, "=")[0]
+	}
 	InitWithAddress(session, session2, sfu_host, sfu_host2, cancel)
 }
 
@@ -125,6 +135,7 @@ func dctodc(dc *webrtc.DataChannel, c2 *sdk.Client) {
 	}
 	dc.OnClose(func() {
 		dc2.Close()
+		return
 	})
 	dc.OnMessage(func(msg webrtc.DataChannelMessage) {
 		log.Warnf("Message from DataChannel %v %v", dc.Label(), string(msg.Data))
@@ -137,7 +148,7 @@ func dctodc(dc *webrtc.DataChannel, c2 *sdk.Client) {
 	})
 }
 
-func tracktotrack(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver, c2 *sdk.Client) {
+func tracktotrack(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver, c2 *sdk.Client, done chan struct{}) {
 	log.Warnf("GOT TRACK id%v mime%v kind %v stream %v", track.ID(), track.Codec().MimeType, track.Kind(), track.StreamID())
 	newTrack, err := webrtc.NewTrackLocalStaticRTP(webrtc.RTPCodecCapability{MimeType: track.Codec().MimeType}, track.ID(), track.StreamID())
 	if err != nil {
@@ -154,33 +165,36 @@ func tracktotrack(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver, c2 *s
 	}
 	defer c2.UnPublish(t)
 	defer func() {
+		log.Warnf("unpublish track here")
 		lock.Lock()
 		delete(tracks, track.ID())
 		lock.Unlock()
 	}()
-
-	go func() {
-		ticker := time.NewTicker(time.Second * 2)
-		for range ticker.C {
+	ticker := time.NewTicker(time.Second * 2)
+	for {
+		select {
+		case <-done:
+			log.Warnf("stopping tracks publishing")
+			ticker.Stop()
+			return
+		case <-ticker.C:
 			rtcpSendErr := c2.GetSubTransport().GetPeerConnection().WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(track.SSRC())}})
 			if rtcpSendErr != nil {
 				fmt.Println(rtcpSendErr)
 			}
-		}
-	}()
-
-	for {
-		// Read
-		rtpPacket, _, err := track.ReadRTP()
-		if err != nil {
-			fmt.Println("track read error")
-			break
-			// panic(err)
-		}
-		if err = newTrack.WriteRTP(rtpPacket); err != nil {
-			log.Errorf("track write err", err)
-			break
+		default:
+			// Read
+			rtpPacket, _, err := track.ReadRTP()
+			if err != nil {
+				log.Warnf("track read error")
+				return
+				// panic(err)
+			}
+			if err = newTrack.WriteRTP(rtpPacket); err != nil {
+				log.Warnf("track write err", err)
+				return
+			}
 		}
 	}
-	fmt.Println("unpublish track")
+	log.Warnf("unpublish track")
 }

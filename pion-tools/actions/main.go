@@ -2,11 +2,13 @@ package main
 
 import (
 	"net/http"
+	"strconv"
 	"sync"
 
 	"github.com/gin-gonic/gin"
 	loadtest "github.com/manishiitg/actions/loadtest"
 	mirrorsfu "github.com/manishiitg/actions/mirror-sfu"
+	log "github.com/pion/ion-log"
 )
 
 var mu sync.Mutex
@@ -58,10 +60,21 @@ func main() {
 
 	})
 	r.GET("/load/:session1", func(c *gin.Context) {
+		clients := c.Query("clients")
+		no := 1
+		if clients != "" {
+			x, err := strconv.Atoi(clients)
+			if err != nil {
+				log.Errorf("error string to int ", err)
+			} else {
+				no = x
+			}
+		}
+
 		mu.Lock()
 		defer mu.Unlock()
 		cancel := make(chan struct{})
-		go loadtest.InitApi(c.Param("session1"), cancel)
+		go loadtest.InitApi(c.Param("session1"), no, cancel)
 		loadTestCancel = append(loadTestCancel, cancel)
 		c.Status(http.StatusOK)
 	})

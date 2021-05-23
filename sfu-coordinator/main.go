@@ -13,6 +13,7 @@ func main() {
 	etcd.LoadHosts()
 	go etcd.WatchHosts(ctx)
 	go etcd.WatchSessions(ctx)
+	go etcd.WatchCurrentSessionMap(ctx)
 
 	defer cancel()
 	defer etcd.Close()

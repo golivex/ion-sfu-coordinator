@@ -28,11 +28,11 @@ services:
     #     depends_on:
     #         - etcd
 
-    actions:
-        build:
-            context : pion-tools/actions
-        restart: always
-        network_mode: host
+    # actions:
+    #     build:
+    #         context : pion-tools/actions
+    #     restart: always
+    #     network_mode: host
 
     prometheus:
         image: prom/prometheus:latest

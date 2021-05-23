@@ -12,7 +12,8 @@ import (
 )
 
 type HostResponse struct {
-	Host string
+	Host    string
+	Session string
 }
 
 func GetHost(addr string, new_session string, notify chan string, cancel chan struct{}) {
@@ -23,10 +24,10 @@ func GetHost(addr string, new_session string, notify chan string, cancel chan st
 	for {
 		select {
 		case <-done:
-			log.Infof("get host done!")
+			log.Warnf("get host done!")
 			return
 		case <-cancel:
-			log.Infof("get host cancelled, cleanup")
+			log.Warnf("get host cancelled, cleanup")
 			return
 		default:
 			resp, err := http.Get(addr + "session/" + new_session + "?action=1")
@@ -51,12 +52,20 @@ func GetHost(addr string, new_session string, notify chan string, cancel chan st
 					} else if sfu_host == "SERVER_LOAD" {
 						fmt.Println("server is underload need to wait before joining call!")
 						time.Sleep(2 * time.Second)
+					} else if len(sfu_host) == 0 {
+						fmt.Println("host not found")
+						time.Sleep(2 * time.Second)
 					} else {
 						sfu_host = strings.Replace(sfu_host, "700", "5005", -1)
 						// sfu_host = strings.Replace(sfu_host, "7003", "50053", -1)
 						sfu_host = strings.Replace(sfu_host, "\"", "", -1)
-						fmt.Println("sfu host host", sfu_host, "for session", new_session)
-						notify <- sfu_host
+						if len(response.Session) > 0 {
+							fmt.Println("sfu host host", sfu_host, "for session", new_session, "got new session", response.Session)
+							notify <- sfu_host + "=" + response.Session //TODO this string is a temporary solution should be a strcut
+						} else {
+							fmt.Println("sfu host host", sfu_host, "for session", new_session)
+							notify <- sfu_host
+						}
 						close(done)
 					}
 				}

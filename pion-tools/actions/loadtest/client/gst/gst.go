@@ -16,12 +16,9 @@ import (
 	"time"
 	"unsafe"
 
-	logr "github.com/pion/ion-sfu/pkg/logger"
 	"github.com/pion/webrtc/v3"
 	"github.com/pion/webrtc/v3/pkg/media"
 )
-
-var log = logr.New().WithName("gst")
 
 func MainLoop() {
 	C.gstreamer_start_mainloop()
@@ -167,7 +164,6 @@ func CreateTestSrcPipeline(audioTrack, videoTrack *webrtc.TrackLocalStaticSample
 }
 
 func (p *Pipeline) BindAppsinkToTrack(t *webrtc.TrackLocalStaticSample) {
-	log.Info("binding appsink to track", "track", t.ID())
 	trackIdUnsafe := C.CString(t.ID())
 	boundTracks[t.ID()] = t
 	C.gstreamer_send_bind_appsink_track(p.Pipeline, trackIdUnsafe, trackIdUnsafe)
@@ -215,7 +211,8 @@ func goHandlePipelineBuffer(buffer unsafe.Pointer, bufferLen C.int, duration C.i
 	var track *webrtc.TrackLocalStaticSample = boundTracks[C.GoString(localTrackID)]
 	goDuration := time.Duration(duration)
 	if track == nil {
-		log.Error(nil, "nil track: %v ", C.GoString(localTrackID))
+		// log.Error(nil, "nil track: %v ", C.GoString(localTrackID))
+		fmt.Println(nil, "nil track: %v ", C.GoString(localTrackID))
 		return
 	}
 	if err := track.WriteSample(media.Sample{Data: C.GoBytes(buffer, bufferLen), Duration: goDuration}); err != nil && err != io.ErrClosedPipe {
