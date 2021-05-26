@@ -85,7 +85,9 @@ func run(e *sdk.Engine, addr, session, file, role string, total, duration, cycle
 	timer := time.NewTimer(time.Duration(duration) * time.Second)
 
 	// defer recoverClose() //TODO see if this can be fixed from ion-sdk-go or debug how its happening https://github.com/pion/ion-sdk-go/issues/34
+
 	if !fromApi {
+		log.Warnf("starting stats %v")
 		go e.Stats(3)
 	}
 

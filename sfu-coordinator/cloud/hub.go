@@ -20,8 +20,8 @@ type Hub struct {
 
 	machinePingMap map[string]ping
 
-	cloudOp bool // is cloud operation in progress
-
+	cloudOp            bool // is cloud operation in progress
+	lastMachineStarted *machine
 }
 
 func RegisterHub(ctx context.Context) *Hub {
@@ -54,34 +54,42 @@ const WAIT_TIMEOUT_DELETE_CLOUD_IDLE = 15
 const IDLE_TIMEOUT_CLOUD_HOST = 20
 const WAIT_TIMEOUT_DELETE_CLOUD_DEAD = 15
 const MAX_MACHINE_LOAD = 70
-const MINIMUM_CLOUD_HOSTS = 1
-const MAX_CLOUD_HOSTS = 2
+const MINIMUM_CLOUD_HOSTS = 0
+const MAX_CLOUD_HOSTS = 0
 
 func (h *Hub) startServer() {
 	cloudOp := h.cloudOp
-	if cloudOp {
-		log.Infof("cloud op already in progress so skipping!")
+	// need to wait here for the server to come online before we start another server
+	if h.lastMachineStarted != nil {
+		log.Infof("waiting for last machine started to get online")
 	} else {
-		go func() {
-			m, err := StartInstance(-1)
-			if err != nil {
-				log.Errorf("unable to start server %v", err)
-			} else {
-				h.Lock()
-				h.machines[m.Id] = m
-				h.Unlock()
-			}
-			h.Lock()
-			h.cloudOp = false
-			h.Unlock()
-		}()
+		if cloudOp {
+			log.Infof("cloud op already in progress so skipping!")
+		} else {
+			h.cloudOp = true
+			go func() {
+				m, err := StartInstance(-1)
+				if err != nil {
+					log.Errorf("unable to start server %v", err)
+				} else {
+					h.Lock()
+					h.machines[m.Id] = m
+					h.lastMachineStarted = &m
+					time.AfterFunc(2*60*time.Second, func() {
+						h.lastMachineStarted = nil
+					})
+					h.Unlock()
+				}
+				h.cloudOp = false
+			}()
+		}
 	}
 }
 
 func (h *Hub) syncCloudMachines() {
 	h.Lock()
 	defer h.Unlock()
-	log.Infof("sync cloud machines")
+	log.Infof("sync cloud machines, existing machines %v", len(h.machines))
 	machines := GetInstanceList()
 	for _, m := range machines {
 		_, ok := h.machines[m.Id]
@@ -92,16 +100,19 @@ func (h *Hub) syncCloudMachines() {
 	}
 
 	for id, m := range h.machines {
-
 		found := false
 		for _, exm := range machines {
+			log.Infof("machine found from get instance id %v ip %v", id, exm.getIP())
 			if exm.Id == id {
 				found = true
+				break
 			}
 		}
 		if !found {
 			log.Infof("machine deleted %v", m.getIP())
 			delete(h.machines, id)
+		} else {
+			log.Infof("machine already exists %v", m.getIP())
 		}
 
 	}
@@ -125,10 +136,11 @@ func (h *Hub) checkIdleNodes() {
 						log.Infof("node is idle after 20 sec delete it as its cloud instance")
 						m := n.getCloudMachine(h)
 						if m != nil {
-							if len(h.machines) > MAX_CLOUD_HOSTS {
+							if len(h.machines) > MINIMUM_CLOUD_HOSTS {
 								go DeleteInstance(*m)
+								delete(h.machines, m.Id)
 							} else {
-								log.Infof("cannot delete cloud instance as minimum of %v instances required", MAX_CLOUD_HOSTS)
+								log.Infof("cannot delete cloud instance as minimum of %v instances required", MINIMUM_CLOUD_HOSTS)
 							}
 						}
 					} else {
@@ -152,6 +164,23 @@ func (h *Hub) checkIdleNodes() {
 			n.isIdle = false
 		}
 		h.nodes[idx] = n
+	}
+}
+
+func (h *Hub) checkDeadNodes() {
+	h.Lock()
+	defer h.Unlock()
+	//check dead nodes which are not clouds instances
+	for idx, n := range h.nodes {
+		if n.getCloudMachine(h) == nil {
+			log.Infof("node %v is not a cloud instance", n.Ip)
+
+			if time.Since(n.lastPing) > 15*time.Second {
+				log.Infof("removing dead node %v port %v", n.Ip, n.Port)
+				h.nodes = append(h.nodes[:idx], h.nodes[idx+1:]...)
+				break
+			}
+		}
 	}
 }
 
@@ -185,6 +214,7 @@ func (h *Hub) checkDeadMachines() {
 					if time.Since(p.lastIsDeadCheck) > (WAIT_TIMEOUT_DELETE_CLOUD_DEAD * time.Second) {
 						log.Infof("delete this cloud machine as its dead %v", m.getIP())
 						go DeleteInstance(m)
+						delete(h.machinePingMap, id)
 					} else {
 						log.Infof("delete this machine %v but waiting for %v seconds", m.getIP(), WAIT_TIMEOUT_DELETE_CLOUD_DEAD)
 					}
@@ -204,7 +234,7 @@ func (h *Hub) checkDeadMachines() {
 	}
 }
 
-func (h *Hub) checkNodeLoad() {
+func (h *Hub) scaleNodeLoad() {
 	h.Lock()
 	defer h.Unlock()
 
@@ -218,8 +248,8 @@ func (h *Hub) checkNodeLoad() {
 	has_node_unload := false
 	for _, n := range h.nodes {
 
+		log.Infof("node %v port %v load %v peers %v", n.Ip, n.Port, n.Cpu, n.PeerCount)
 		if n.Cpu < float64(MAX_MACHINE_LOAD) {
-			log.Infof("machine %v load %v", n.Ip, n.Cpu)
 			has_node_unload = true
 		}
 
@@ -227,6 +257,7 @@ func (h *Hub) checkNodeLoad() {
 
 	if !has_node_unload && len(h.nodes) != 0 {
 		log.Infof("start new server as all machines are above 70 per load")
+		h.startServer()
 	}
 }
 
@@ -242,10 +273,10 @@ func (h *Hub) autoScaleNodes(ctx context.Context) {
 
 		case <-ticker.C:
 			log.Infof("auto scaling nodes")
+			h.checkDeadNodes()
 			h.checkDeadMachines()
 			h.checkIdleNodes()
-			h.checkNodeLoad()
-
+			h.scaleNodeLoad()
 		}
 	}
 
@@ -253,13 +284,22 @@ func (h *Hub) autoScaleNodes(ctx context.Context) {
 
 func (hub *Hub) UpdateNodeLoad(ip string, port string, peer int, cpu float64) {
 
-	log.Infof("updating host load ip%v port%v peer %v cpu%v", ip, port, peer, cpu)
+	// log.Infof("updating host load ip%v port%v peer %v cpu%v", ip, port, peer, cpu)
+
+	if hub.lastMachineStarted != nil {
+		lm := *hub.lastMachineStarted
+		if lm.getIP() == ip {
+			log.Infof("last machine started is online! %v", lm.getIP())
+			hub.lastMachineStarted = nil
+		}
+	}
 	found := false
 	for idx, n := range hub.nodes {
 
 		if n.Ip == ip && n.Port == port {
 			n.PeerCount = peer
 			n.Cpu = cpu
+			n.lastPing = time.Now()
 			hub.nodes[idx] = n
 			found = true
 			break
@@ -271,6 +311,7 @@ func (hub *Hub) UpdateNodeLoad(ip string, port string, peer int, cpu float64) {
 			Port:      port,
 			PeerCount: peer,
 			Cpu:       cpu,
+			lastPing:  time.Now(),
 		})
 	}
 }

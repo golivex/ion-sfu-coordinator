@@ -14,6 +14,7 @@ import (
 type HostResponse struct {
 	Host    string
 	Session string
+	Publish bool //not using this as of now as purpose of load test will fail
 }
 
 func GetHost(addr string, new_session string, notify chan string, cancel chan struct{}) {
@@ -30,7 +31,8 @@ func GetHost(addr string, new_session string, notify chan string, cancel chan st
 			log.Warnf("get host cancelled, cleanup")
 			return
 		default:
-			resp, err := http.Get(addr + "session/" + new_session + "?action=1")
+			log.Warnf("getting sfu from %v", addr)
+			resp, err := http.Get(addr + "session/" + new_session)
 			if err != nil {
 				log.Errorf("%v", err)
 				time.Sleep(10 * time.Second)
@@ -46,6 +48,7 @@ func GetHost(addr string, new_session string, notify chan string, cancel chan st
 						log.Errorf("error parsing host response", err)
 					}
 					sfu_host := response.Host
+					log.Warnf("response %v", response)
 					if sfu_host == "NO_HOSTS_RETRY" {
 						fmt.Println("waiting for host to get ready!")
 						time.Sleep(2 * time.Second)

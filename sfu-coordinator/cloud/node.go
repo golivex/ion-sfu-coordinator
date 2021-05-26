@@ -1,6 +1,10 @@
 package cloud
 
-import "time"
+import (
+	"time"
+
+	log "github.com/pion/ion-log"
+)
 
 type node struct {
 	Ip                string
@@ -9,6 +13,7 @@ type node struct {
 	Cpu               float64
 	isIdle            bool
 	lastIdleCheckTime time.Time
+	lastPing          time.Time
 }
 
 func (n *node) isCloud(h *Hub) bool {
@@ -33,6 +38,7 @@ func (n *node) checkAllNodeIdle(h *Hub) bool {
 
 func (n *node) getCloudMachine(h *Hub) *machine {
 	for _, m := range h.machines {
+		log.Infof("checking for cloud machine from node m.getIp %v n.Ip%v", m.getIP(), n.Ip)
 		if m.getIP() == n.Ip {
 			return &m
 		}

@@ -14,6 +14,32 @@ func getZone() []string {
 	return []string{"asia-south1-a", "asia-south1-b", "asia-south1-c", "asia-east1-a", "asia-east1-b", "asia-east1-c", "us-central1-a", "us-central1-b"}
 }
 
+// n1-standard-1 $0.04749975
+// n1-standard-2 $0.0949995
+// n1-standard-4 $0.189999
+// n1-standard-8 $0.379998
+// n1-standard-16 $0.759996
+
+// n1-highcpu-2	$0.0708486
+// n1-highcpu-4 $0.1416972
+// n1-highcpu-8 $0.2833944
+// n1-highcpu-16 $0.5667888
+
+// n2-standard-2 $0.097118
+// n2-standard-4 $0.194236
+// n2-standard-8 $0.388472
+
+// n2-highcpu-2	$0.071696
+// n2-highcpu-4	$0.143392
+// n2-highcpu-8	$0.286784
+// n2-highcpu-16 $0.573568
+
+//n2d-standard-2 $0.084492
+// n2d-standard-4 $0.168984
+// n2d-highcpu-2 $0.062376
+// n2d-highcpu-4 $0.124752
+// machineTypes := []string{"n1-standard-1", "n1-highcpu-2", "n1-standard-4"}
+
 func StartInstance(zoneidx int) (machine, error) {
 
 	var m machine
@@ -41,11 +67,12 @@ func StartInstance(zoneidx int) (machine, error) {
 		"--zone="+zone,
 		"--machine-type=n1-standard-1",
 		"--tags=sfu",
-		"--image-family=ubuntu-2004-lts",
-		"--image-project=ubuntu-os-cloud",
+		"--image=sfu-image",
+		// "--image-family=ubuntu-2004-lts",
+		// "--image-project=ubuntu-os-cloud",
 		"--maintenance-policy=TERMINATE",
 		"--boot-disk-type=pd-ssd",
-		"--metadata-from-file", "startup-script=./cloud/startup.sh",
+		"--metadata-from-file", "startup-script=./cloud/imagestartup.sh",
 		"--create-disk", "size=100GB,type=pd-ssd,auto-delete=yes", "--format=json").Output() //--scopes=logging-write,compute-rw,cloud-platform
 
 	// var stdout bytes.Buffer
@@ -89,7 +116,7 @@ func GetInstanceList() []machine {
 
 	var sfum []machine
 	for _, m := range machines {
-		if m.isSfu() {
+		if m.isSfu() && m.IsRunning() {
 			m.CreationTimestamp = m.CreationTimestamp.In(loc)
 			sfum = append(sfum, m)
 		}

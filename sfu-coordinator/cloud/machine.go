@@ -8,6 +8,7 @@ import (
 
 type machine struct {
 	Id                string                           `json:"id"`
+	MachineType       string                           `json:"machineType"`
 	Zone              string                           `json:"zone"`
 	Name              string                           `json:"name"`
 	Status            string                           `json:"status"`

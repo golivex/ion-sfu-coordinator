@@ -31,6 +31,26 @@ type Peer struct {
 	Tracks []Track
 }
 
+func (e *etcdCoordinator) deleteOrphanSession() {
+	e.mu.Lock()
+
+	log.Infof("deleteOrphanSession")
+	for key, session := range e.sessions {
+		exist := false
+		for _, host := range e.hosts {
+			if host.Ip == session.Host && host.Port == session.Port {
+				exist = true
+				break
+			}
+		}
+		if !exist {
+			log.Infof("orphan session found %v", session.Name)
+			delete(e.sessions, key)
+		}
+	}
+	e.mu.Unlock()
+}
+
 func (e *etcdCoordinator) deleteSessionsForHost(host string) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -70,7 +90,7 @@ func (e *etcdCoordinator) removeSession(sessionstr string) {
 	log.Infof("key %v", key)
 	_, ok := e.sessions[key]
 	if !ok {
-		log.Infof("session doesnt exist %v %v", key, e.sessions)
+		// log.Infof("session doesnt exist %v %v", key, e.sessions)
 		return
 	}
 	if len(s) > 6 {
@@ -227,7 +247,7 @@ func (e *etcdCoordinator) generateSessionTree(sessionstr string) {
 		livesession := e.sessions[key]
 
 		if foundidx == -1 {
-			log.Infof("e.sessions[key].peer %v", livesession.Peers)
+			// log.Infof("e.sessions[key].peer %v", livesession.Peers)
 			livesession.Peers = append(livesession.Peers, *ePeer)
 		} else {
 			livesession.Peers[foundidx] = *ePeer
@@ -381,6 +401,14 @@ func (e *etcdCoordinator) LoadSessions() {
 		sessionstr := string(ev.Key[:])
 		log.Infof("load session str %v", sessionstr)
 		e.generateSessionTree(sessionstr)
+	}
+	e.deleteOrphanSession()
+	ticker := time.NewTicker(60 * time.Second)
+	for {
+		select {
+		case <-ticker.C:
+			e.deleteOrphanSession()
+		}
 	}
 }
 

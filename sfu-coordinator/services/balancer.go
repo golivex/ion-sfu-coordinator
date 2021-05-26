@@ -15,8 +15,8 @@ const CAN_HOST_SCALE = false
 // after that load hosts cannot join at all
 // hopefully till then feat relay is completed in ionsfu
 
-const MAX_TRACKS_PER_HOST = 6      //if more than X tracks cannot connect to host at all
-const MAX_PUBLISH_TRACK_THRESH = 2 //if more than X tracks cannot publish anymore, can only subscribe
+const MAX_TRACKS_PER_HOST = 9999      //if more than X tracks cannot connect to host at all
+const MAX_PUBLISH_TRACK_THRESH = 9999 //if more than X tracks cannot publish anymore, can only subscribe
 
 const MAX_CPULOAD_PER_HOST = 90       // if more than X cpu load, cannot connect to the host at all until load goes down
 const MAX_PUBLISH_CPULOAD_THRESH = 70 // if more than X cpu, cannot publish can only subscribe
@@ -227,13 +227,13 @@ func (e *etcdCoordinator) isHostJustAssignedToSession(session string) *Host {
 }
 
 func (e *etcdCoordinator) allocateHostToSession(session string) *Host {
-	var min_load float64
+	min_load := float64(0)
 	var min_load_host *Host
 
 	for _, host := range e.hosts {
 		cpu := host.GetCurrentLoad()
 		log.Infof("host %v loads %v", host.Ip, cpu)
-		if cpu > min_load {
+		if cpu >= min_load {
 			min_load_host = &host
 		}
 	}

@@ -21,7 +21,7 @@ func clientThread() {
 	flag.StringVar(&session, "session", "test", "join session name")
 	flag.IntVar(&total, "clients", 1, "Number of clients to start")
 	flag.IntVar(&cycle, "cycle", 1000, "Run new client cycle in ms")
-	flag.IntVar(&duration, "duration", 60*5, "Running duration in sencond")
+	flag.IntVar(&duration, "duration", 60*60, "Running duration in sencond")
 	flag.StringVar(&role, "role", "pubsub", "Run as pubsub/sub")
 	flag.StringVar(&loglevel, "log", "info", "Log level")
 	flag.BoolVar(&video, "v", true, "Publish video stream from webm file")

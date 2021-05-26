@@ -29,6 +29,7 @@ type Host struct {
 	Spike       []Spike `json:"spike"`
 	Loads       []Load
 	spikemu     sync.Mutex
+	lastPing    time.Time
 }
 
 type Load struct {
@@ -84,10 +85,11 @@ func (e *etcdCoordinator) addHost(key string, loadStr []byte) {
 		}
 
 		host := Host{
-			Ip:    hostping.Ip,
-			Port:  hostping.Port,
-			Loads: []Load{},
-			Spike: []Spike{},
+			Ip:       hostping.Ip,
+			Port:     hostping.Port,
+			Loads:    []Load{},
+			Spike:    []Spike{},
+			lastPing: time.Now(),
 		}
 		host.Loads = append(host.Loads, l)
 		e.hosts[key] = host
@@ -95,6 +97,7 @@ func (e *etcdCoordinator) addHost(key string, loadStr []byte) {
 	} else {
 		host := e.hosts[key]
 		host.Loads = append(host.Loads, l)
+		host.lastPing = time.Now()
 		len := len(host.Loads)
 		if len >= 5 {
 			host.Loads = host.Loads[1:]
@@ -104,13 +107,22 @@ func (e *etcdCoordinator) addHost(key string, loadStr []byte) {
 }
 func (e *etcdCoordinator) deleteHost(ip string) {
 	e.mu.Lock()
-	defer e.mu.Unlock()
 	ip = strings.Replace(ip, "available-hosts/", "", -1)
 	_, ok := e.hosts[ip]
 	if ok {
 		delete(e.hosts, ip)
 	}
+	e.mu.Unlock()
 	e.deleteSessionsForHost(ip)
+}
+
+func (e *etcdCoordinator) deleteOrphanHosts() {
+	for _, host := range e.hosts {
+		if time.Since(host.lastPing) > 30 {
+			log.Infof("no ping from hosts since last 30 sec deleting it")
+			e.deleteHost(host.Ip)
+		}
+	}
 }
 
 func (e *etcdCoordinator) LoadHosts() {
@@ -125,6 +137,15 @@ func (e *etcdCoordinator) LoadHosts() {
 		ip := string(ev.Key[:])
 		loadStr := ev.Value[:]
 		e.addHost(ip, loadStr)
+	}
+
+	e.deleteOrphanHosts()
+	ticker := time.NewTicker(60 * time.Second)
+	for {
+		select {
+		case <-ticker.C:
+			e.deleteOrphanHosts()
+		}
 	}
 }
 
@@ -143,8 +164,8 @@ func (e *etcdCoordinator) WatchHosts(ctx context.Context) {
 				e.deleteHost(ip)
 
 			}
-			log.Infof(" watch host %s %q : %q\n", ev.Type, ev.Kv.Key, ev.Kv.Value)
-			log.Infof("hosts %v", e.hosts)
+			// log.Infof(" watch host %s %q : %q\n", ev.Type, ev.Kv.Key, ev.Kv.Value)
+			// log.Infof("hosts %v", e.hosts)
 		}
 	}
 }

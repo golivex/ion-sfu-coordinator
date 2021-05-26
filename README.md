@@ -16,9 +16,12 @@ update its active sessions on it
 2) Will have a master http service which will have a list of nodes, based on the load/no of session / existing sessions via etcd it will provide 
 the node in which we can start a new session
 
-3) (edit, need to test mirror sfu) we cannot scale up a conference call in which there are multiple publishers. one conf call cannot scale more than a single server, so if server goes to 100% load we simply cannot allow more users we can only allow subscribers after like 80% load.
-
 3.a) we will have to identify the type of call as well i.e group/call (small max 6), meeting upto 50, conference (200-300). if is type of call is group, we can allow to join even if load is more than 80% but not for meeting and conference. but there are lot of issues in this... need to think of a better way
+
+4) we need to know capablity of a server before hand, that is the best way to handle this and also the requirment of a call
+if we know its a server than can handle only 20hosts, there is no point assiging it a conference for 300 users
+like if we have a meeting room with 30 people, we should start a cpu with 2vcpu and assign it to that host only
+if we have small group we can use n1 instances
 
 4) for live stream in which there is only publisher and multiple subscribers, we can forward sfu from one server to another. new users will have to wait till the new server is active. 
 
@@ -63,9 +66,8 @@ b) problem, for a peer to start streaming, it takes few seconds for streams to s
 Observation
 ==============
 
-n1-standard-2  upto 20-30 clients cpu goes 90%
-n1-standard-4  upto 50 clients cpu goes 80%
-n2-standard-4  upto 50 clients cpu goes 70%
+n1-standard-1 upto 20-30 80% load
+n2-highcpu-8  upto 40 only 25% load
 
 video 640x360 bigbuckbunny
 
