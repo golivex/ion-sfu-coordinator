@@ -147,8 +147,8 @@ func run(e *sdk.Engine, addr, session, file, role string, total, duration, cycle
 			}
 			config := sdk.NewJoinConfig().SetNoPublish()
 			c.Join(new_session, config)
-			c.Simulcast(simulcast)
 			defer e.DelClient(c)
+			c.Simulcast(simulcast)
 		case "pub":
 			cid := fmt.Sprintf("%s_pub_%d_%s", session, i, cuid.New())
 			log.Errorf("AddClient session=%v clientid=%v addr=%v", session, cid, addr)
@@ -159,8 +159,8 @@ func run(e *sdk.Engine, addr, session, file, role string, total, duration, cycle
 			}
 			config := sdk.NewJoinConfig().SetNoSubscribe()
 			c.Join(session, config)
-			c.Simulcast(simulcast)
 			defer e.DelClient(c)
+			c.Simulcast(simulcast)
 			if !strings.Contains(file, ".webm") {
 				var producer *client.GSTProducer
 				log.Warnf("starrting new gst producer")

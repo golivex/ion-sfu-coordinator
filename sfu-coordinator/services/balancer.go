@@ -7,14 +7,25 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
-const MAX_TRACKS_PER_HOST = 4
-const MAX_CLOUD_HOSTS = 0
-const MAX_CPU_LOAD = 70
+const CAN_HOST_SCALE = false
+
+//as of now host cannot scale, first i am implemeting simply strategy
+//i.e if host cannot scale then upto a specific load hosts can join
+// after that load hosts can join only as a subscriber
+// after that load hosts cannot join at all
+// hopefully till then feat relay is completed in ionsfu
+
+const MAX_TRACKS_PER_HOST = 6      //if more than X tracks cannot connect to host at all
+const MAX_PUBLISH_TRACK_THRESH = 2 //if more than X tracks cannot publish anymore, can only subscribe
+
+const MAX_CPULOAD_PER_HOST = 90       // if more than X cpu load, cannot connect to the host at all until load goes down
+const MAX_PUBLISH_CPULOAD_THRESH = 70 // if more than X cpu, cannot publish can only subscribe
 
 type HostReply struct {
 	Host    string
 	Status  string
 	Session string
+	Publish bool
 }
 
 const NO_HOSTS_RETRY = "NO_HOSTS_RETRY"
@@ -41,9 +52,12 @@ func (e *etcdCoordinator) FindHost(session string, isaction bool) HostReply {
 		}
 	}
 
+	e.debugSession()
+	log.Infof("before find host session debug")
+
 	sfu.SyncHost(e)
 
-	if sfu.IsScaledSession(session) {
+	if sfu.IsScaledSession(session) && CAN_HOST_SCALE {
 		// hostip := sfu.GetSessionHost(session)
 		// here we should find all the hosts which the scaled host has
 		// and see which host has avaiblity?
@@ -58,7 +72,7 @@ func (e *etcdCoordinator) FindHost(session string, isaction bool) HostReply {
 				Status:  "SCALED_HOST_OPTIMAL",
 			}
 		} else {
-			nhost := e.findAvailableHost(host)
+			nhost := e.findAvailableHost(nil) //TODO extend this to pass arary of all hosts which are already scaled
 			if nhost != nil {
 				host := sfu.GetOptimalSourceHost(session)
 				nsession := sfu.AssignHostToSession(session, nhost, host)
@@ -89,65 +103,101 @@ func (e *etcdCoordinator) FindHost(session string, isaction bool) HostReply {
 			status = NEW_HOST_ASSIGNED_SESSION
 		}
 	}
-	if e.canHostServe(host) {
+	if canServe, canPublish := e.canHostServe(host); canServe {
 		e.SpikeHost(*host)
 		return HostReply{
-			Host:   host.String(),
-			Status: status,
+			Host:    host.String(),
+			Status:  status,
+			Publish: canPublish,
 		}
 	} else {
-		nhost := e.findAvailableHost(host)
-		if nhost != nil {
-			//need to scale sfu on this host first
-			if status == HOST_SESSION_EXISTS {
+		if CAN_HOST_SCALE {
+			nhost := e.findAvailableHost(host)
+			if nhost != nil && CAN_HOST_SCALE {
+				//need to scale sfu on this host first
+				if status == HOST_SESSION_EXISTS {
 
-				nsession := sfu.AssignHostToSession(session, nhost, host)
-				go MirrorSfu(session, nsession, *host, *nhost)
-				return HostReply{
-					// Host:   nhost.String(),
-					Status: HOST_SCALING,
+					nsession := sfu.AssignHostToSession(session, nhost, host)
+					go MirrorSfu(session, nsession, *host, *nhost)
+					return HostReply{
+						Host:    nhost.String(),
+						Status:  HOST_SCALING,
+						Session: nsession,
+					}
+				} else {
+					e.SpikeHost(*nhost)
+					return HostReply{
+						Host:   nhost.String(),
+						Status: HOST_ALTERNATE,
+					}
 				}
-			} else {
-				e.SpikeHost(*nhost)
-				return HostReply{
-					Host:   nhost.String(),
-					Status: HOST_ALTERNATE,
-				}
-			}
-		} else {
-			return HostReply{
-				Status: HOST_LOAD_ONLY_SUBSCRIBE,
 			}
 		}
+		return HostReply{
+			Status: "HOST_LOAD_EXCEED",
+		}
+
 	}
 }
 
-func (e *etcdCoordinator) canHostServe(host *Host) bool {
+func (e *etcdCoordinator) canHostServe(host *Host) (canServe bool, canPublish bool) {
 
 	log.Infof("checking can host server for %v", *host)
 
-	log.Infof("(host.AudioTracks + host.VideoTracks) %v host %v", (host.AudioTracks + host.VideoTracks), host.String())
+	log.Infof("(host.AudioTracks + host.VideoTracks) %v host %v host.GetCurrentLoad() %v", (host.AudioTracks + host.VideoTracks), host.String(), host.GetCurrentLoad())
 	spikepeer, spiketracks, spikecpu := e.GetSpikeLoad(*host)
+	cpu := host.GetCurrentLoad()
 	log.Infof("Extra spike load %v %v %v", spikepeer, spiketracks, spikecpu)
-	if (host.AudioTracks + host.VideoTracks + spiketracks) >= MAX_TRACKS_PER_HOST {
-		return false
+
+	if (cpu + spikecpu) > MAX_CPULOAD_PER_HOST {
+		log.Infof("cpu load already at max host cannot server cpu %v  max load %v", (cpu + spikecpu), MAX_CPULOAD_PER_HOST)
+		return false, false
 	} else {
-		cpu := host.GetCurrentLoad()
-		if (cpu + spikecpu) > MAX_CPU_LOAD {
-			return false
+
+		if (cpu + spikecpu) > MAX_PUBLISH_CPULOAD_THRESH {
+			log.Infof("cpu load above publish threashhold cpu %v load %v", (cpu + spikecpu), MAX_PUBLISH_CPULOAD_THRESH)
+			return true, false
+		} else {
+
+			trackload := (host.AudioTracks + host.VideoTracks + spiketracks)
+			if trackload >= MAX_TRACKS_PER_HOST {
+				log.Infof("max tracks reached for this host tracks %v max tracks per host", trackload, MAX_TRACKS_PER_HOST)
+				return false, false
+			} else {
+
+				if trackload >= MAX_PUBLISH_TRACK_THRESH {
+					log.Infof("max tracks reached for publishing host %v max tracks per host", trackload, MAX_TRACKS_PER_HOST)
+					return true, false
+				} else {
+					log.Infof("host can serve and publish")
+					return true, true
+				}
+
+			}
+
 		}
-		return true
+
 	}
 }
 
 func (e *etcdCoordinator) findAvailableHost(existhost *Host) *Host {
 	var fhost *Host
-	for _, host := range e.hosts {
-		if host.String() != existhost.String() {
-			if e.canHostServe(&host) {
+	if existhost == nil {
+		for _, host := range e.hosts {
+			if canServe, _ := e.canHostServe(&host); canServe {
 				log.Infof("host willing to server found %v", host.String())
 				fhost = &host
 				break
+			}
+		}
+	} else {
+		for _, host := range e.hosts {
+			if host.String() != existhost.String() {
+				if canServe, _ := e.canHostServe(&host); canServe {
+					log.Infof("host willing to server found %v", host.String())
+					fhost = &host
+					break
+				}
 			}
 		}
 	}

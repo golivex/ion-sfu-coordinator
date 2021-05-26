@@ -5,12 +5,36 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	log "github.com/pion/ion-log"
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
+
+type Spike struct {
+	Peer   int
+	Tracks int
+	Cpu    float64
+	Time   time.Time
+}
+
+type Host struct {
+	Ip          string  `json:"ip"`
+	Port        string  `json:"port"`
+	PeerCount   int     `json:"peer"`
+	AudioTracks int     `json:"audio"`
+	VideoTracks int     `json:"video"`
+	Spike       []Spike `json:"spike"`
+	Loads       []Load
+	spikemu     sync.Mutex
+}
+
+type Load struct {
+	Cpu float64 `json:"cpu"`
+	Mem float64 `json:"mem"`
+}
 
 func (h *Host) String() string {
 	return h.Ip + ":" + h.Port
@@ -50,6 +74,15 @@ func (e *etcdCoordinator) addHost(key string, loadStr []byte) {
 
 	_, ok := e.hosts[key]
 	if !ok {
+		if len(hostping.Ip) == 0 {
+			log.Infof("hostping %v", hostping)
+			panic("empty ip") //temp
+		}
+		if len(hostping.Port) == 0 {
+			log.Infof("hostping %v", hostping)
+			panic("empty port") //temp
+		}
+
 		host := Host{
 			Ip:    hostping.Ip,
 			Port:  hostping.Port,
@@ -110,8 +143,8 @@ func (e *etcdCoordinator) WatchHosts(ctx context.Context) {
 				e.deleteHost(ip)
 
 			}
-			// log.Infof(" watch host %s %q : %q\n", ev.Type, ev.Kv.Key, ev.Kv.Value)
-			// log.Infof("hosts %v", e.hosts)
+			log.Infof(" watch host %s %q : %q\n", ev.Type, ev.Kv.Key, ev.Kv.Value)
+			log.Infof("hosts %v", e.hosts)
 		}
 	}
 }

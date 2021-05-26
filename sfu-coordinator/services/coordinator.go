@@ -4,53 +4,12 @@ import (
 	"sync"
 	"time"
 
+	cloud "github.com/golivex/sfu-coordinator/cloud"
+
 	log "github.com/pion/ion-log"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"google.golang.org/grpc"
 )
-
-type Spike struct {
-	Peer   int
-	Tracks int
-	Cpu    float64
-	Time   time.Time
-}
-
-type Host struct {
-	Ip          string  `json:"ip"`
-	Port        string  `json:"port"`
-	PeerCount   int     `json:"peer"`
-	AudioTracks int     `json:"audio"`
-	VideoTracks int     `json:"video"`
-	Spike       []Spike `json:"spike"`
-	Loads       []Load
-	spikemu     sync.Mutex
-}
-
-type Load struct {
-	Cpu float64 `json:"cpu"`
-	Mem float64 `json:"mem"`
-}
-
-type Track struct {
-	Id   string
-	Kind string
-}
-
-type LiveSession struct {
-	Name        string
-	Host        string
-	Port        string
-	PeerCount   int
-	AudioTracks int
-	VideoTracks int
-	Peers       []Peer
-}
-
-type Peer struct {
-	Id     string
-	Tracks []Track
-}
 
 type etcdCoordinator struct {
 	mu  sync.Mutex
@@ -58,6 +17,7 @@ type etcdCoordinator struct {
 
 	hosts    map[string]Host        `json:"hosts"`
 	sessions map[string]LiveSession `json:"sessions"`
+	cloud    *cloud.Hub
 }
 
 func NewCoordinatorEtcd(host string) *etcdCoordinator {
@@ -79,6 +39,11 @@ func NewCoordinatorEtcd(host string) *etcdCoordinator {
 	}
 
 }
+
+func (e *etcdCoordinator) RegisterCloudProvider(h *cloud.Hub) {
+	e.cloud = h
+}
+
 func (e *etcdCoordinator) Close() {
 	e.cli.Close()
 }
@@ -107,7 +72,7 @@ func (e *etcdCoordinator) SpikeHost(h Host) {
 	for key, host := range e.hosts {
 		if h.String() == host.String() {
 			e.hosts[key] = h
-			log.Errorf("host spiked %v %v", h.String())
+			log.Errorf("host spiked %v", h.String())
 			break
 		}
 	}

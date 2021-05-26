@@ -15,7 +15,13 @@ import (
 )
 
 var lock sync.Mutex
-var tracks = make(map[string]*webrtc.TrackLocalStaticRTP)
+
+type TrackMap struct {
+	id    string
+	track *webrtc.TrackLocalStaticRTP
+}
+
+var tracks = make(map[string][]TrackMap)
 
 func InitWithAddress(session, session2, addr, addr2 string, cancel chan struct{}) {
 	// add stun servers
@@ -39,14 +45,14 @@ func InitWithAddress(session, session2, addr, addr2 string, cancel chan struct{}
 	e := sdk.NewEngine(config)
 	// create a new client from engine
 	uniq := rand.Intn(1000000)
-	cid1 := fmt.Sprintf("client-mirror-%v", uniq)
+	cid1 := fmt.Sprintf("client-mirror-1-%v", uniq)
 	c1, err := sdk.NewClient(e, addr, cid1)
 	if err != nil {
 		log.Errorf("err=%v", err)
 		return
 	}
 
-	cid2 := fmt.Sprintf("client-mirror-%v", uniq)
+	cid2 := fmt.Sprintf("client-mirror-2-%v", uniq)
 	c2, err := sdk.NewClient(e, addr2, cid2)
 	if err != nil {
 		log.Errorf("err=%v", err)
@@ -55,34 +61,34 @@ func InitWithAddress(session, session2, addr, addr2 string, cancel chan struct{}
 
 	done := make(chan struct{})
 
-	c1.OnDataChannel = func(dc *webrtc.DataChannel) {
-		go dctodc(dc, c2)
-	}
+	// c1.OnDataChannel = func(dc *webrtc.DataChannel) {
+	// 	go dctodc(dc, c2)
+	// }
 	// c2.OnDataChannel = func(dc *webrtc.DataChannel) {
 	// 	go dctodc(dc, c1)
 	// }
 	c1.OnTrack = func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
-		go tracktotrack(track, receiver, c2, done)
+		go tracktotrack(track, receiver, c2, done, cid1)
 	}
-	c2.OnTrack = func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
-		go tracktotrack(track, receiver, c1, done)
-	}
+	// c2.OnTrack = func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
+	// 	go tracktotrack(track, receiver, c1, done, cid2)
+	// }
 
 	err = c1.Join(session, nil)
-	defer e.DelClient(c1)
+	defer c1.Close()
 	if err != nil {
 		log.Errorf("err=%v", err)
 		return
 	}
-	log.Warnf("c1 joined %v", addr)
+	log.Warnf("c1 joined %v session %v", addr, session)
 
 	err = c2.Join(session2, nil)
-	defer e.DelClient(c1)
+	defer c2.Close()
 	if err != nil {
 		log.Errorf("err=%v", err)
 		return
 	}
-	log.Warnf("c2 joined %v", addr2)
+	log.Warnf("c2 joined %v session %v", addr2, session2)
 	log.Warnf("mirroring now")
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
@@ -93,11 +99,13 @@ func InitWithAddress(session, session2, addr, addr2 string, cancel chan struct{}
 			return
 		case <-ticker.C:
 			lock.Lock()
-			no := len(tracks)
+			no1 := len(tracks[cid1])
+			no2 := len(tracks[cid2])
+			// log.Infof("session tracker c1:%v no1:%v c2:%v no2:%v", cid1, no1, cid2, no2)
 			lock.Unlock()
-			if no == 0 {
-				log.Warnf("no tracks found closing")
-				close(done)
+			if no1 == 0 || no2 == 0 {
+				// log.Warnf("no tracks found closing")
+				// close(done)
 			} else {
 				// fmt.Println("tracks found! ", no)
 			}
@@ -148,14 +156,17 @@ func dctodc(dc *webrtc.DataChannel, c2 *sdk.Client) {
 	})
 }
 
-func tracktotrack(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver, c2 *sdk.Client, done chan struct{}) {
+func tracktotrack(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver, c2 *sdk.Client, done chan struct{}, cid string) {
 	log.Warnf("GOT TRACK id%v mime%v kind %v stream %v", track.ID(), track.Codec().MimeType, track.Kind(), track.StreamID())
-	newTrack, err := webrtc.NewTrackLocalStaticRTP(webrtc.RTPCodecCapability{MimeType: track.Codec().MimeType}, track.ID(), track.StreamID())
+	newTrack, err := webrtc.NewTrackLocalStaticRTP(webrtc.RTPCodecCapability{MimeType: track.Codec().MimeType}, track.ID(), "mirror-"+track.StreamID())
 	if err != nil {
 		panic(err)
 	}
 	lock.Lock()
-	tracks[track.ID()] = newTrack
+	tracks[cid] = append(tracks[cid], TrackMap{
+		id:    track.ID(),
+		track: newTrack,
+	})
 	lock.Unlock()
 
 	t, err := c2.Publish(newTrack)
@@ -163,25 +174,42 @@ func tracktotrack(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver, c2 *s
 		log.Errorf("publish err=%v", err)
 		return
 	}
+	go func() {
+		rtcpBuf := make([]byte, 1500)
+		for {
+			if _, _, rtcpErr := t.Sender().Read(rtcpBuf); rtcpErr != nil {
+				return
+			}
+		}
+	}()
 	defer c2.UnPublish(t)
 	defer func() {
 		log.Warnf("unpublish track here")
 		lock.Lock()
-		delete(tracks, track.ID())
+		alltracks := tracks[cid]
+		newtracks := []TrackMap{}
+		for _, tr := range alltracks {
+			if newTrack.ID() != tr.id {
+				newtracks = append(newtracks, tr)
+			}
+		}
+		tracks[cid] = newtracks
 		lock.Unlock()
 	}()
-	ticker := time.NewTicker(time.Second * 2)
+	if track.Kind() == webrtc.RTPCodecTypeVideo {
+		ticker := time.NewTicker(time.Second * 2)
+		defer ticker.Stop()
+		rtcpSendErr := c2.GetPubTransport().GetPeerConnection().WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(track.SSRC())}})
+		if rtcpSendErr != nil {
+			fmt.Println(rtcpSendErr)
+		}
+	}
+
 	for {
 		select {
 		case <-done:
 			log.Warnf("stopping tracks publishing")
-			ticker.Stop()
 			return
-		case <-ticker.C:
-			rtcpSendErr := c2.GetSubTransport().GetPeerConnection().WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(track.SSRC())}})
-			if rtcpSendErr != nil {
-				fmt.Println(rtcpSendErr)
-			}
 		default:
 			// Read
 			rtpPacket, _, err := track.ReadRTP()

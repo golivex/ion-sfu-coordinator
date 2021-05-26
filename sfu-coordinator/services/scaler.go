@@ -9,6 +9,8 @@ import (
 	log "github.com/pion/ion-log"
 )
 
+const MIRROR_IDENTIFIER = "-mirror-"
+
 type SfuScaler struct {
 	hostmap map[string]*Host //this will map all scaled session and their assigned hosts
 	mu      sync.Mutex
@@ -29,13 +31,26 @@ func (sfu SfuScaler) IsScaledSession(session string) bool {
 	defer sfu.mu.Unlock()
 	_, ok := sfu.hostmap[session]
 	log.Infof("IsScaledSession %v - - %v", session, ok)
+	// its possible that we first scaled session so there is entry in hostmap but then scaled it back, so all other sessions will get removed but hostmap stays for origin
+	// so need to check if other sessions also exists
+	if ok && strings.Index(session, MIRROR_IDENTIFIER) == -1 {
+		// origin session
+		scaled_host_found := false
+		log.Infof("is origin session so check it properly")
+		for key, _ := range sfu.hostmap {
+			if strings.Index(key, session+MIRROR_IDENTIFIER) != -1 {
+				scaled_host_found = true
+			}
+		}
+		return scaled_host_found
+	}
 	return ok
 }
 
 func (sfu SfuScaler) AssignHostToSession(session string, nhost *Host, base *Host) string {
 	sfu.mu.Lock()
 	defer sfu.mu.Unlock()
-	scaledsessionname := fmt.Sprintf("%v-scale-%v-%v", session, len(sfu.hostmap), rand.Intn(10000000))
+	scaledsessionname := fmt.Sprintf("%v-%v-%v-%v", session, MIRROR_IDENTIFIER, len(sfu.hostmap), rand.Intn(10000000))
 	sfu.hostmap[scaledsessionname] = nhost
 	sfu.hostmap[session] = base
 	return scaledsessionname
@@ -61,14 +76,13 @@ func (sfu SfuScaler) SyncHost(e *etcdCoordinator) {
 				delete(sfu.hostmap, session)
 			}
 		}
-
 	}
 
 	for _, livesession := range e.sessions {
 		//TODO what happens is that hostmap has the memory address of Host form when it was assigned,
 		// but if in the mean while more tracks get added to it, those don't get updated on this host
 		// so we have to assign the latest host every time
-		if strings.Index(livesession.Name, "-scale-") != -1 {
+		if strings.Index(livesession.Name, MIRROR_IDENTIFIER) != -1 {
 			log.Infof("found scaled session %v", livesession.Name)
 			hostfound := false
 			origin := ""
@@ -83,7 +97,7 @@ func (sfu SfuScaler) SyncHost(e *etcdCoordinator) {
 				}
 			}
 			if !hostfound {
-				log.Infof("not host found for scaled session")
+				log.Infof("no host found for the scaled session")
 				_, ok := sfu.hostmap[livesession.Name]
 				if ok {
 					log.Infof("host removed from scaler %v %v", livesession.Name, sfu.hostmap[livesession.Name])
@@ -91,7 +105,7 @@ func (sfu SfuScaler) SyncHost(e *etcdCoordinator) {
 				}
 			} else {
 				log.Infof("host found for scaled session")
-				idx := strings.Index(livesession.Name, "-scale-")
+				idx := strings.Index(livesession.Name, MIRROR_IDENTIFIER)
 				origin = livesession.Name[:idx]
 			}
 
@@ -120,8 +134,8 @@ func (sfu SfuScaler) SyncHost(e *etcdCoordinator) {
 			}
 
 		}
-
 	}
+	log.Infof("host map after syncing hosts %v", sfu.hostmap)
 }
 
 func (sfu SfuScaler) GetOptimalSourceHost(session string) *Host {
@@ -129,8 +143,8 @@ func (sfu SfuScaler) GetOptimalSourceHost(session string) *Host {
 	defer sfu.mu.Unlock()
 	log.Infof("finding optmizal host for %v", session)
 	origin := session
-	if strings.Index(session, "-scale-") != -1 {
-		idx := strings.Index(session, "-scale-")
+	if strings.Index(session, MIRROR_IDENTIFIER) != -1 {
+		idx := strings.Index(session, MIRROR_IDENTIFIER)
 		origin = session[:idx]
 	}
 
@@ -142,7 +156,7 @@ func (sfu SfuScaler) GetOptimalSourceHost(session string) *Host {
 	log.Infof("sfu hostmap %v", sfu.hostmap)
 	for name, host := range sfu.hostmap {
 		log.Infof("name %v origin %v", name, origin)
-		if strings.Index(name, origin+"-scale-") != -1 {
+		if strings.Index(name, origin+MIRROR_IDENTIFIER) != -1 {
 			allhosts[name] = host
 		}
 	}
@@ -169,8 +183,8 @@ func (sfu SfuScaler) FindOptmialHost(session string, e *etcdCoordinator) (*Host,
 	defer sfu.mu.Unlock()
 	log.Infof("finding optmizal host for %v", session)
 	origin := session
-	if strings.Index(session, "-scale-") != -1 {
-		idx := strings.Index(session, "-scale-")
+	if strings.Index(session, MIRROR_IDENTIFIER) != -1 {
+		idx := strings.Index(session, MIRROR_IDENTIFIER)
 		origin = session[:idx]
 	}
 
@@ -182,7 +196,7 @@ func (sfu SfuScaler) FindOptmialHost(session string, e *etcdCoordinator) (*Host,
 	log.Infof("sfu hostmap %v", sfu.hostmap)
 	for name, host := range sfu.hostmap {
 		log.Infof("name %v origin %v", name, origin)
-		if strings.Index(name, origin+"-scale-") != -1 {
+		if strings.Index(name, origin+MIRROR_IDENTIFIER) != -1 {
 			allhosts[name] = host
 		}
 	}
@@ -192,7 +206,7 @@ func (sfu SfuScaler) FindOptmialHost(session string, e *etcdCoordinator) (*Host,
 	var optmialhost *Host
 	opsession := ""
 	for name, host := range allhosts {
-		if e.canHostServe(host) {
+		if canServe, _ := e.canHostServe(host); canServe {
 			optmialhost = host
 			opsession = name
 			break
