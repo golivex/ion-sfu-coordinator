@@ -20,8 +20,7 @@ func (e *etcdCoordinator) InitApi() {
 		c.Status(http.StatusOK)
 	})
 	r.GET("/stats", func(c *gin.Context) {
-		e.mu.Lock()
-		defer e.mu.Unlock()
+		//TODO add infor about machines also here from e.cloud
 		c.JSON(200, gin.H{
 			"hosts":    e.hosts,
 			"sessions": e.sessions,
@@ -35,8 +34,17 @@ func (e *etcdCoordinator) InitApi() {
 			})
 			return
 		}
-		isaction := c.Query("action")
-		host := e.FindHost(id, len(isaction) > 0)
+		capacity := c.Query("capacity")
+		cap := -1
+
+		if len(capacity) > 0 {
+			x, err := strconv.Atoi(capacity)
+			if err == nil {
+				cap = x
+			}
+		}
+
+		host := e.FindHost(id, cap)
 		c.JSON(200, host)
 	})
 	r.GET("/stopload", func(c *gin.Context) {

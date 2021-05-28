@@ -7,7 +7,7 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
-const CAN_HOST_SCALE = false
+const CAN_HOST_MIRROR = false
 
 //as of now host cannot scale, first i am implemeting simply strategy
 //i.e if host cannot scale then upto a specific load hosts can join
@@ -18,7 +18,7 @@ const CAN_HOST_SCALE = false
 const MAX_TRACKS_PER_HOST = 9999      //if more than X tracks cannot connect to host at all
 const MAX_PUBLISH_TRACK_THRESH = 9999 //if more than X tracks cannot publish anymore, can only subscribe
 
-const MAX_CPULOAD_PER_HOST = 90       // if more than X cpu load, cannot connect to the host at all until load goes down
+const MAX_CPULOAD_PER_HOST = 80       // if more than X cpu load, cannot connect to the host at all until load goes down
 const MAX_PUBLISH_CPULOAD_THRESH = 70 // if more than X cpu, cannot publish can only subscribe
 
 type HostReply struct {
@@ -37,58 +37,98 @@ const HOST_ALTERNATE = "HOST_ALTERNATE"
 const HOST_SCALED_SESSION_FROM_ACTION = "HOST_SCALED_SESSION_FROM_ACTION"
 const HOST_FROM_ACTION = "HOST_FROM_ACTION"
 
+const DEFAULT_CAPACITY = 5
+
 type HostSession struct {
 	ip   string
 	name string
 }
 
-func (e *etcdCoordinator) FindHost(session string, isaction bool) HostReply {
+func (e *etcdCoordinator) FindHost(session string, capacity int) HostReply {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	if len(e.hosts) == 0 {
-		return HostReply{
-			Status: NO_HOSTS_RETRY,
-		}
+	if capacity == -1 {
+		capacity = DEFAULT_CAPACITY
 	}
 
-	e.debugSession()
-	log.Infof("before find host session debug")
-
-	sfu.SyncHost(e)
-
-	if sfu.IsScaledSession(session) && CAN_HOST_SCALE {
-		// hostip := sfu.GetSessionHost(session)
-		// here we should find all the hosts which the scaled host has
-		// and see which host has avaiblity?
-		// but what if there is no host which is avaiable or we have started a new host its not started yet?
-
-		host, opsession := sfu.FindOptmialHost(session, e)
-		if host != nil {
-			e.SpikeHost(*host)
-			return HostReply{
-				Host:    host.String(),
-				Session: opsession,
-				Status:  "SCALED_HOST_OPTIMAL",
-			}
-		} else {
-			nhost := e.findAvailableHost(nil) //TODO extend this to pass arary of all hosts which are already scaled
-			if nhost != nil {
-				host := sfu.GetOptimalSourceHost(session)
-				nsession := sfu.AssignHostToSession(session, nhost, host)
-
-				go MirrorSfu(session, nsession, *host, *nhost)
-
+	if len(e.hosts) == 0 {
+		if e.cloud != nil {
+			if e.isHostBlockedBySession(session) {
 				return HostReply{
-					Status: "HOST_SCALE_MULTIPLE",
+					Status: "SERVER_PROVISIONING",
 				}
 			} else {
-				return HostReply{
-					Status: "SCALED_HOST_NOT_FOUND",
+				if e.cloud.CanAddMachine() {
+					if !e.startServerAndBlockSession(session, capacity) {
+						return HostReply{
+							Status: "STARTING_NEW_CLOUD_SERVER",
+						}
+					} else {
+						return HostReply{
+							Status: "SERVER_PROVISIONING",
+						}
+					}
+				} else {
+					return HostReply{
+						Status: "NO_HOSTS_CANANOT_START_CLOUD",
+					}
 				}
 			}
+		} else {
+			return HostReply{
+				Status: NO_HOSTS_RETRY,
+			}
 		}
+
 	}
+
+	// e.debugSession()
+	// log.Infof("before find host session debug")
+
+	// if CAN_HOST_MIRROR {
+	// 	sfu.SyncHost(e)
+
+	// 	if sfu.IsScaledSession(session) {
+	// 		// hostip := sfu.GetSessionHost(session)
+	// 		// here we should find all the hosts which the scaled host has
+	// 		// and see which host has avaiblity?
+	// 		// but what if there is no host which is avaiable or we have started a new host its not started yet?
+
+	// 		host, opsession := sfu.FindOptmialHost(session, e)
+	// 		if host != nil {
+	// 			e.SpikeHost(host)
+	// 			if e.ThrottleHost(host) {
+	// 				return HostReply{
+	// 					Status: "HOST_THROTTLE",
+	// 				}
+	// 			} else {
+	// 				return HostReply{
+	// 					Host:    host.String(),
+	// 					Session: opsession,
+	// 					Status:  "SCALED_HOST_OPTIMAL",
+	// 				}
+	// 			}
+
+	// 		} else {
+	// 			nhost := e.findAvailableHost(nil) //TODO extend this to pass arary of all hosts which are already scaled
+	// 			if nhost != nil {
+	// 				host := sfu.GetOptimalSourceHost(session)
+	// 				nsession := sfu.AssignHostToSession(session, nhost, host)
+
+	// 				go MirrorSfu(session, nsession, *host, *nhost)
+
+	// 				return HostReply{
+	// 					Status: "HOST_SCALE_MULTIPLE",
+	// 				}
+	// 			} else {
+	// 				return HostReply{
+	// 					Status: "SCALED_HOST_NOT_FOUND",
+	// 				}
+	// 			}
+	// 		}
+	// 	}
+	// }
 
 	host := e.checkHostForExistingSession(session)
 	status := ""
@@ -99,40 +139,73 @@ func (e *etcdCoordinator) FindHost(session string, isaction bool) HostReply {
 		if host != nil {
 			status = "SESSION_ASSIGNED_RECENTLY"
 		} else {
-			host = e.allocateHostToSession(session)
-			status = NEW_HOST_ASSIGNED_SESSION
+			host = e.allocateHostToSession(session, capacity)
+			if host == nil {
+				if e.cloud != nil {
+					if e.cloud.CanAddMachine() {
+						if !e.startServerAndBlockSession(session, capacity) {
+							return HostReply{
+								Status: "HOST_LOAD_EXECEEDED_SCALING_NEW",
+							}
+						} else {
+							return HostReply{
+								Status: "HOST_LOAD_EXECEEDED_SCALING_NEW_PROVISIONING",
+							}
+						}
+					} else {
+						return HostReply{
+							Status: "HOST_UNAVAILABLE",
+						}
+					}
+				} else {
+					return HostReply{
+						Status: "HOST_UNAVAILABLE",
+					}
+				}
+
+			} else {
+				status = NEW_HOST_ASSIGNED_SESSION
+			}
 		}
 	}
 	if canServe, canPublish := e.canHostServe(host); canServe {
-		e.SpikeHost(*host)
-		return HostReply{
-			Host:    host.String(),
-			Status:  status,
-			Publish: canPublish,
-		}
-	} else {
-		if CAN_HOST_SCALE {
-			nhost := e.findAvailableHost(host)
-			if nhost != nil && CAN_HOST_SCALE {
-				//need to scale sfu on this host first
-				if status == HOST_SESSION_EXISTS {
-
-					nsession := sfu.AssignHostToSession(session, nhost, host)
-					go MirrorSfu(session, nsession, *host, *nhost)
-					return HostReply{
-						Host:    nhost.String(),
-						Status:  HOST_SCALING,
-						Session: nsession,
-					}
-				} else {
-					e.SpikeHost(*nhost)
-					return HostReply{
-						Host:   nhost.String(),
-						Status: HOST_ALTERNATE,
-					}
-				}
+		e.SpikeHost(host)
+		e.blockHostCapacity(session, host, capacity)
+		if e.ThrottleHost(host) {
+			return HostReply{
+				Status: "HOST_THROTTLE",
+			}
+		} else {
+			return HostReply{
+				Host:    host.String(),
+				Status:  status,
+				Publish: canPublish,
 			}
 		}
+	} else {
+		// if CAN_HOST_MIRROR {
+		// 	nhost := e.findAvailableHost(host)
+		// 	if nhost != nil && CAN_HOST_MIRROR {
+		// 		//need to scale sfu on this host first
+		// 		if status == HOST_SESSION_EXISTS {
+
+		// 			nsession := sfu.AssignHostToSession(session, nhost, host)
+		// 			go MirrorSfu(session, nsession, *host, *nhost)
+		// 			return HostReply{
+		// 				Host:    nhost.String(),
+		// 				Status:  HOST_SCALING,
+		// 				Session: nsession,
+		// 			}
+		// 		} else {
+		// 			e.SpikeHost(nhost)
+		// 			e.blockHostCapacity(session, host, capacity)
+		// 			return HostReply{
+		// 				Host:   nhost.String(),
+		// 				Status: HOST_ALTERNATE,
+		// 			}
+		// 		}
+		// 	}
+		// }
 		return HostReply{
 			Status: "HOST_LOAD_EXCEED",
 		}
@@ -226,27 +299,53 @@ func (e *etcdCoordinator) isHostJustAssignedToSession(session string) *Host {
 	return fhost
 }
 
-func (e *etcdCoordinator) allocateHostToSession(session string) *Host {
-	min_load := float64(0)
+func (e *etcdCoordinator) allocateHostToSession(session string, capacity int) *Host {
+	min_load := float64(99999)
+	max_load := float64(MAX_PUBLISH_CPULOAD_THRESH)
 	var min_load_host *Host
 
-	for _, host := range e.hosts {
-		cpu := host.GetCurrentLoad()
-		log.Infof("host %v loads %v", host.Ip, cpu)
-		if cpu >= min_load {
-			min_load_host = &host
-		}
-	}
+	blockedhost := e.getHostBlockedBySession(session)
+	if blockedhost == nil {
+		for _, host := range e.hosts {
 
-	hoststr := min_load_host.String()
-	kvc := clientv3.NewKV(e.cli)
-	resp, err := e.cli.Grant(context.Background(), 5)
-	if err != nil {
-		log.Errorf("lease grant error", err)
+			//first check capablity
+			if e.cloud != nil && capacity != -1 {
+				hcap := e.cloud.GetMachineCapability(host.Ip)
+				blocked := e.getBlockedCapacity(&host)
+				if hcap == -1 {
+					log.Infof("unknow host capablity, assiming that host will be able to handle the load %v", hcap)
+				} else if capacity > (hcap - blocked) {
+					log.Infof("skipping host as machine cannot handle the required capablity %v avaiablble capacity %v blocked capacvity %v", capacity, hcap, blocked)
+					continue
+				}
+
+			}
+
+			cpu := host.GetCurrentLoad()
+			log.Infof("host %v loads %v", host.Ip, cpu)
+			if cpu <= min_load {
+				min_load_host = &host
+				min_load = cpu
+			}
+		}
+		if min_load > max_load {
+			min_load_host = nil
+		}
 	} else {
-		_, err = kvc.Put(context.Background(), "/temp/"+session, hoststr, clientv3.WithLease(resp.ID))
+		log.Infof("blocked host found for session %v host %v", session, blockedhost.String())
+		min_load_host = blockedhost
+	}
+	if min_load_host != nil {
+		hoststr := min_load_host.String()
+		kvc := clientv3.NewKV(e.cli)
+		resp, err := e.cli.Grant(context.Background(), 5)
 		if err != nil {
-			log.Errorf("host temp key set error", err)
+			log.Errorf("lease grant error", err)
+		} else {
+			_, err = kvc.Put(context.Background(), "/temp/"+session, hoststr, clientv3.WithLease(resp.ID))
+			if err != nil {
+				log.Errorf("host temp key set error", err)
+			}
 		}
 	}
 	return min_load_host

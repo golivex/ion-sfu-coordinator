@@ -19,9 +19,27 @@ the node in which we can start a new session
 3.a) we will have to identify the type of call as well i.e group/call (small max 6), meeting upto 50, conference (200-300). if is type of call is group, we can allow to join even if load is more than 80% but not for meeting and conference. but there are lot of issues in this... need to think of a better way
 
 4) we need to know capablity of a server before hand, that is the best way to handle this and also the requirment of a call
+
 if we know its a server than can handle only 20hosts, there is no point assiging it a conference for 300 users
 like if we have a meeting room with 30 people, we should start a cpu with 2vcpu and assign it to that host only
 if we have small group we can use n1 instances
+
+===  how above will be implemented, as soon we get a request we start a server based on required capacity. suppose we get a request for 50 users we start a server. in the same time we get another user for 50 users on a different session what happens. we will have to wait for the first server to start and second session request will have to wait for almost 40sec and then only its server will start this a problem...............
+
+also when new server will start it will automatically get allocated to any of the sessions if we don't implement any kind of hold on server which i am not planning to... that is also fine.... 
+
+what if i start server for every new session insteadnly. that would be best..... 
+
+but support if i get a request for 100 users and 30 users... not i have started two servers... one for 100 and 30 users.. 
+but problem is that what can happen is that 100 users server get allocated to 30users server, and 100 users session is empty.. so it will take more time.
+
+so we will have to block server for session and also we have to start multiple servres together as needed...
+both are needed
+
+
+also suppose we have an n1 server, and lot we get lot of connections. then cpu goes of 100 easily.
+we need to way to slow down how we give out hosts. and wait for actual cpu reply to come?
+
 
 4) for live stream in which there is only publisher and multiple subscribers, we can forward sfu from one server to another. new users will have to wait till the new server is active. 
 

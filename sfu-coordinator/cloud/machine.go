@@ -19,11 +19,16 @@ type machine struct {
 }
 
 func (m *machine) isSfu() bool {
-	return strings.Index(m.getName(), "sfu-") != -1
+	return strings.Contains(m.getName(), "sfu-")
 }
 
 func (m *machine) toString() string {
-	return m.Name + m.GetZone()
+	return m.Name + " " + m.GetZone() + " " + m.getInstanceType()
+}
+
+func (m *machine) getInstanceType() string {
+	split := strings.Split(m.MachineType, "/")
+	return split[len(split)-1]
 }
 
 func (m *machine) getName() string {

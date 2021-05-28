@@ -16,8 +16,8 @@ func main() {
 
 	etcd := coordinator.NewCoordinatorEtcd("0.0.0.0:2379")
 	defer etcd.Close()
-	go etcd.LoadSessions()
-	go etcd.LoadHosts()
+	go etcd.LoadSessions(ctx)
+	go etcd.LoadHosts(ctx)
 	go etcd.WatchHosts(ctx)
 	go etcd.WatchSessions(ctx)
 	go etcd.WatchCurrentSessionMap(ctx)

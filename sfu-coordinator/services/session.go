@@ -44,7 +44,7 @@ func (e *etcdCoordinator) deleteOrphanSession() {
 			}
 		}
 		if !exist {
-			log.Infof("orphan session found %v", session.Name)
+			// log.Infof("orphan session found %v", session.Name)
 			delete(e.sessions, key)
 		}
 	}
@@ -213,7 +213,7 @@ func (e *etcdCoordinator) generateSessionTree(sessionstr string) {
 				break
 			}
 		}
-		log.Infof("ePeer %v", ePeer)
+		// log.Infof("ePeer %v", ePeer)
 		if ePeer == nil {
 			ePeer = &Peer{
 				Id:     p,
@@ -389,17 +389,15 @@ func (e *etcdCoordinator) debugSession() {
 	log.Infof("*************")
 }
 
-func (e *etcdCoordinator) LoadSessions() {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	resp, err := e.cli.Get(ctx, "/session/", clientv3.WithPrefix(), clientv3.WithSort(clientv3.SortByKey, clientv3.SortDescend))
-	cancel()
+func (e *etcdCoordinator) LoadSessions(ctx context.Context) {
+	resp, err := e.cli.Get(ctx, "/session/", clientv3.WithPrefix())
 	if err != nil {
 		log.Errorf("error fetching session", err)
 	}
 	for _, ev := range resp.Kvs {
 		// log.Infof("%s : %s\n", ev.Key, ev.Value)
 		sessionstr := string(ev.Key[:])
-		log.Infof("load session str %v", sessionstr)
+		// log.Infof("load session str %v", sessionstr)
 		e.generateSessionTree(sessionstr)
 	}
 	e.deleteOrphanSession()

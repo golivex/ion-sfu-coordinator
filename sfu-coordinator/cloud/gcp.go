@@ -4,11 +4,16 @@ import (
 	"encoding/json"
 	"errors"
 	"os/exec"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/lucsky/cuid"
 	log "github.com/pion/ion-log"
 )
+
+const DEFAULT_MACHINE_TYPE = "n1-standard-1"
+const DEFAULT_MACHINE_SERIES = "n1"
 
 func getZone() []string {
 	return []string{"asia-south1-a", "asia-south1-b", "asia-south1-c", "asia-east1-a", "asia-east1-b", "asia-east1-c", "us-central1-a", "us-central1-b"}
@@ -40,7 +45,22 @@ func getZone() []string {
 // n2d-highcpu-4 $0.124752
 // machineTypes := []string{"n1-standard-1", "n1-highcpu-2", "n1-standard-4"}
 
-func StartInstance(zoneidx int) (machine, error) {
+func GetInstanceCapablity(mtype string) int {
+	//return rough idea of instance capablity
+	s := strings.Split(mtype, "-")
+	cputype := s[0]
+	vcpu := s[2]
+	i, _ := strconv.Atoi(vcpu)
+	if cputype == "n1" {
+		return i * 20 //approve 20 peers per core
+	}
+	if cputype == "n2" {
+		return i * 30 //approx 30 peers per core
+	}
+	return -1
+}
+
+func StartInstance(capacity int, zoneidx int) (machine, error) {
 
 	var m machine
 	ex := GetInstanceList()
@@ -59,20 +79,37 @@ func StartInstance(zoneidx int) (machine, error) {
 	if zoneidx < len(zones) {
 		zone = zones[zoneidx]
 	} else {
-		return m, errors.New("all zones completed!")
+		return m, errors.New("all zones completed")
+	}
+	machine_type := "n1-standard-1"
+	if capacity == -1 {
+		machine_type = DEFAULT_MACHINE_TYPE
+	} else {
+		if capacity > 20 && capacity < 50 {
+			machine_type = DEFAULT_MACHINE_SERIES + "-highcpu-2"
+		} else if capacity >= 50 && capacity < 100 {
+			machine_type = DEFAULT_MACHINE_SERIES + "-highcpu-4"
+		} else if capacity >= 100 && capacity < 300 {
+			machine_type = DEFAULT_MACHINE_SERIES + "-highcpu-8"
+		} else if capacity >= 300 {
+			machine_type = DEFAULT_MACHINE_SERIES + "-highcpu-16"
+		} else {
+			machine_type = DEFAULT_MACHINE_TYPE
+		}
 	}
 	name = "sfu-" + name
 	output, err := exec.Command(
 		"gcloud", "beta", "compute", "instances", "create", name,
 		"--zone="+zone,
-		"--machine-type=n1-standard-1",
+		"--machine-type="+machine_type,
 		"--tags=sfu",
-		"--image=sfu-image",
-		// "--image-family=ubuntu-2004-lts",
+		"--image=sfu-minimal-image",
+		// "--image-family=ubuntu-minimal-2010",
 		// "--image-project=ubuntu-os-cloud",
 		"--maintenance-policy=TERMINATE",
 		"--boot-disk-type=pd-ssd",
-		"--metadata-from-file", "startup-script=./cloud/imagestartup.sh",
+		"--metadata-from-file", "startup-script=./cloud/scripts/imagestartup.sh",
+		// "--metadata-from-file", "startup-script=./cloud/scripts/startup.sh",
 		"--create-disk", "size=100GB,type=pd-ssd,auto-delete=yes", "--format=json").Output() //--scopes=logging-write,compute-rw,cloud-platform
 
 	// var stdout bytes.Buffer
@@ -81,10 +118,11 @@ func StartInstance(zoneidx int) (machine, error) {
 	// cmd.Stderr = &stderr
 	// err := cmd.Run()
 	// log.Infof("stdout.String(), stderr.String()", stdout.String(), stderr.String())
+	// output := []byte("")
 
 	if err != nil {
 		log.Errorf("StartServer", err)
-		return StartInstance(zoneidx + 1)
+		return StartInstance(capacity, zoneidx+1)
 	}
 	// log.Debugf("output %v", string(output))
 
@@ -118,6 +156,7 @@ func GetInstanceList() []machine {
 	for _, m := range machines {
 		if m.isSfu() && m.IsRunning() {
 			m.CreationTimestamp = m.CreationTimestamp.In(loc)
+			// log.Infof("found instance %v", m.toString())
 			sfum = append(sfum, m)
 		}
 	}

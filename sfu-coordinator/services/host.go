@@ -3,7 +3,6 @@ package coordinator
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -13,23 +12,22 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
-type Spike struct {
-	Peer   int
-	Tracks int
-	Cpu    float64
-	Time   time.Time
+type capacity struct {
+	Cap  int       `json:"cap"`
+	Time time.Time `json:"time"`
 }
 
 type Host struct {
-	Ip          string  `json:"ip"`
-	Port        string  `json:"port"`
-	PeerCount   int     `json:"peer"`
-	AudioTracks int     `json:"audio"`
-	VideoTracks int     `json:"video"`
-	Spike       []Spike `json:"spike"`
-	Loads       []Load
-	spikemu     sync.Mutex
-	lastPing    time.Time
+	Ip              string  `json:"ip"`
+	Port            string  `json:"port"`
+	PeerCount       int     `json:"peer"`
+	AudioTracks     int     `json:"audio"`
+	VideoTracks     int     `json:"video"`
+	Spike           []Spike `json:"spike"`
+	BlockedCapacity map[string]capacity
+	Loads           []Load
+	spikemu         sync.Mutex
+	lastPing        time.Time
 }
 
 type Load struct {
@@ -85,11 +83,12 @@ func (e *etcdCoordinator) addHost(key string, loadStr []byte) {
 		}
 
 		host := Host{
-			Ip:       hostping.Ip,
-			Port:     hostping.Port,
-			Loads:    []Load{},
-			Spike:    []Spike{},
-			lastPing: time.Now(),
+			Ip:              hostping.Ip,
+			Port:            hostping.Port,
+			Loads:           []Load{},
+			Spike:           []Spike{},
+			BlockedCapacity: make(map[string]capacity),
+			lastPing:        time.Now(),
 		}
 		host.Loads = append(host.Loads, l)
 		e.hosts[key] = host
@@ -108,11 +107,25 @@ func (e *etcdCoordinator) addHost(key string, loadStr []byte) {
 func (e *etcdCoordinator) deleteHost(ip string) {
 	e.mu.Lock()
 	ip = strings.Replace(ip, "available-hosts/", "", -1)
-	_, ok := e.hosts[ip]
-	if ok {
-		delete(e.hosts, ip)
+	port := ""
+	if strings.Contains(ip, ":") {
+		port = strings.Split(ip, ":")[1]
+		ip = strings.Split(ip, ":")[0]
 	}
+
+	for key, host := range e.hosts {
+		if host.Ip == ip && host.Port == port {
+			log.Infof("deleting host %v", host.String())
+			delete(e.hosts, key)
+			if e.cloud != nil {
+				e.cloud.DeleteNode(ip, port)
+			}
+
+		}
+	}
+
 	e.mu.Unlock()
+
 	e.deleteSessionsForHost(ip)
 }
 
@@ -125,15 +138,14 @@ func (e *etcdCoordinator) deleteOrphanHosts() {
 	}
 }
 
-func (e *etcdCoordinator) LoadHosts() {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	resp, err := e.cli.Get(ctx, "available-hosts//", clientv3.WithPrefix(), clientv3.WithSort(clientv3.SortByKey, clientv3.SortDescend))
-	cancel()
+func (e *etcdCoordinator) LoadHosts(ctx context.Context) {
+	log.Infof("load existing hosts")
+	resp, err := e.cli.Get(ctx, "available-hosts/", clientv3.WithPrefix())
 	if err != nil {
 		log.Errorf("error fetching hosts", err)
 	}
 	for _, ev := range resp.Kvs {
-		fmt.Printf("%s : %s\n", ev.Key, ev.Value)
+		log.Infof("%s : %s\n", ev.Key, ev.Value)
 		ip := string(ev.Key[:])
 		loadStr := ev.Value[:]
 		e.addHost(ip, loadStr)
