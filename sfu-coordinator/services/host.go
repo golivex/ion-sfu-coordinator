@@ -19,6 +19,7 @@ type capacity struct {
 type Host struct {
 	Ip              string  `json:"ip"`
 	Port            string  `json:"port"`
+	Tasks           int     `json:"tasks"`
 	PeerCount       int     `json:"peer"`
 	AudioTracks     int     `json:"audio"`
 	VideoTracks     int     `json:"video"`
@@ -84,7 +85,7 @@ type HostPing struct {
 	Mem  float64 `json:"mem"`
 }
 
-func (e *etcdCoordinator) addHost(key string, loadStr []byte) {
+func (e *etcdCoordinator) addHost(key string, loadStr []byte, isaction bool) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	var hostping HostPing
@@ -97,7 +98,12 @@ func (e *etcdCoordinator) addHost(key string, loadStr []byte) {
 		Mem: hostping.Mem,
 	}
 
-	_, ok := e.hosts[key]
+	var ok bool
+	if isaction {
+		_, ok = e.actionhosts[key]
+	} else {
+		_, ok = e.hosts[key]
+	}
 	if !ok {
 		if len(hostping.Ip) == 0 {
 			log.Infof("hostping %v", hostping)
@@ -117,36 +123,62 @@ func (e *etcdCoordinator) addHost(key string, loadStr []byte) {
 			lastPing:        time.Now(),
 		}
 		host.Loads = append(host.Loads, l)
-		e.hosts[key] = host
+		if isaction {
+			e.actionhosts[key] = host
+		} else {
+			e.hosts[key] = host
+		}
 	} else {
-		host := e.hosts[key]
+		var host Host
+		if isaction {
+			host = e.actionhosts[key]
+		} else {
+			host = e.hosts[key]
+		}
 		host.Loads = append(host.Loads, l)
 		host.lastPing = time.Now()
 		len := len(host.Loads)
 		if len >= 30 {
 			host.Loads = host.Loads[1:]
 		}
-		e.hosts[key] = host
+		if isaction {
+			e.actionhosts[key] = host
+		} else {
+			e.hosts[key] = host
+		}
 	}
 	e.updateHostSessions()
 }
 
-func (e *etcdCoordinator) deleteHost(h *Host) {
+func (e *etcdCoordinator) deleteHost(h *Host, isaction bool) {
 	e.mu.Lock()
-	for key, host := range e.hosts {
+	var hosts map[string]Host
+	if isaction {
+		hosts = e.actionhosts
+	} else {
+		hosts = e.hosts
+	}
+	for key, host := range hosts {
 		if host.Ip == h.Ip && host.Port == h.Port {
 			log.Infof("deleting host %v", host.String())
-			e.deleteSessionsForHost(&host)
-			if e.cloud != nil {
-				e.cloud.DeleteNode(host.Ip, host.Port)
+			if !isaction {
+				e.deleteSessionsForHost(&host)
+				if e.cloud != nil {
+					e.cloud.DeleteNode(host.Ip, host.Port)
+				}
+				delete(e.hosts, key)
+			} else {
+				if e.cloud != nil {
+					e.cloud.DeleteNode(host.Ip, host.Port)
+				}
+				delete(e.actionhosts, key)
 			}
-			delete(e.hosts, key)
 
 		}
 	}
 	e.mu.Unlock()
 }
-func (e *etcdCoordinator) deleteHostString(ip string) {
+func (e *etcdCoordinator) deleteHostString(ip string, isaction bool) {
 	ip = strings.Replace(ip, "available-hosts/", "", -1)
 	port := ""
 	if strings.Contains(ip, ":") {
@@ -154,10 +186,17 @@ func (e *etcdCoordinator) deleteHostString(ip string) {
 		ip = strings.Split(ip, ":")[0]
 	}
 
-	for _, host := range e.hosts {
+	var hosts map[string]Host
+	if isaction {
+		hosts = e.actionhosts
+	} else {
+		hosts = e.hosts
+	}
+
+	for _, host := range hosts {
 		if host.Ip == ip && host.Port == port {
-			log.Infof("deleting host %v", host.String())
-			e.deleteHost(&host)
+			log.Infof("deleting host %v type isaction %v", host.String(), isaction)
+			e.deleteHost(&host, isaction)
 			break
 		}
 	}
@@ -167,7 +206,7 @@ func (e *etcdCoordinator) deleteOrphanHosts() {
 	for _, host := range e.hosts {
 		if time.Since(host.lastPing) > 30*time.Second {
 			log.Infof("no ping from hosts since last 30 sec deleting it %v", host.String())
-			e.deleteHost(&host)
+			e.deleteHost(&host, false)
 		}
 	}
 }
@@ -182,7 +221,7 @@ func (e *etcdCoordinator) LoadHosts(ctx context.Context) {
 		log.Infof("%s : %s\n", ev.Key, ev.Value)
 		ip := string(ev.Key[:])
 		loadStr := ev.Value[:]
-		e.addHost(ip, loadStr)
+		e.addHost(ip, loadStr, false)
 	}
 
 	ticker := time.NewTicker(10 * time.Second)
@@ -202,12 +241,39 @@ func (e *etcdCoordinator) WatchHosts(ctx context.Context) {
 			if ev.Type == mvccpb.PUT {
 				ip := string(ev.Kv.Key[:])
 				loadStr := ev.Kv.Value[:]
-				e.addHost(ip, loadStr)
+				e.addHost(ip, loadStr, false)
 			}
 			if ev.Type == mvccpb.DELETE {
 				ip := string(ev.Kv.Key[:])
-				e.deleteHostString(ip)
+				e.deleteHostString(ip, false)
 
+			}
+			// log.Infof(" watch host %s %q : %q\n", ev.Type, ev.Kv.Key, ev.Kv.Value)
+			// log.Infof("hosts %v", e.hosts)
+		}
+	}
+}
+
+func (e *etcdCoordinator) WatchActionHosts(ctx context.Context) {
+	log.Infof("watching action hosts")
+	rch := e.cli.Watch(ctx, "action-hosts/", clientv3.WithPrefix())
+	for wresp := range rch {
+		for _, ev := range wresp.Events {
+			if ev.Type == mvccpb.PUT {
+				ip := string(ev.Kv.Key[:])
+				loadStr := ev.Kv.Value[:]
+				e.addHost(ip, loadStr, true)
+			}
+			if ev.Type == mvccpb.DELETE {
+				ip := string(ev.Kv.Key[:])
+				e.deleteHostString(ip, true)
+
+			}
+			if e.cloud != nil {
+				for _, host := range e.actionhosts {
+					cpu := host.GetCurrentLoad()
+					e.cloud.UpdateActionNodeLoad(host.Ip, host.Port, host.Tasks, cpu)
+				}
 			}
 			// log.Infof(" watch host %s %q : %q\n", ev.Type, ev.Kv.Key, ev.Kv.Value)
 			// log.Infof("hosts %v", e.hosts)

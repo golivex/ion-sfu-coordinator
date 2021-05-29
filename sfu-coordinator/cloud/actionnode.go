@@ -6,17 +6,17 @@ import (
 	log "github.com/pion/ion-log"
 )
 
-type node struct {
+type actionnode struct {
 	Ip                string
 	Port              string
-	PeerCount         int
+	Tasks             int
 	Cpu               float64
 	isIdle            bool
 	lastIdleCheckTime time.Time
 	lastPing          time.Time
 }
 
-func (n *node) isCloud(h *Hub) bool {
+func (n *actionnode) isCloud(h *Hub) bool {
 	cloud := false
 	log.Infof("checking machines %v", len(h.machines))
 	for _, m := range h.machines {
@@ -28,7 +28,7 @@ func (n *node) isCloud(h *Hub) bool {
 	return cloud
 }
 
-func (n *node) checkAllNodeIdle(h *Hub) bool {
+func (n *actionnode) checkAllNodeIdle(h *Hub) bool {
 	all_idle := true
 	for _, n2 := range h.nodes {
 		if n2.Ip == n.Ip && !n2.isIdle {
@@ -38,7 +38,7 @@ func (n *node) checkAllNodeIdle(h *Hub) bool {
 	return all_idle
 }
 
-func (n *node) getCloudMachine(h *Hub) *machine {
+func (n *actionnode) getCloudMachine(h *Hub) *machine {
 	for _, m := range h.machines {
 		log.Infof("checking for cloud machine from node m.getIp %v n.Ip%v", m.getIP(), n.Ip)
 		if m.getIP() == n.Ip {
@@ -48,11 +48,11 @@ func (n *node) getCloudMachine(h *Hub) *machine {
 	return nil
 }
 
-func (h *Hub) checkIdleNodes() {
+func (h *Hub) checkIdleActionNodes() {
 	h.Lock()
 	defer h.Unlock()
-	log.Infof("checking idle nodes %v", len(h.nodes))
-	for idx, n := range h.nodes {
+	log.Infof("checking idle action nodes %v", len(h.actionnodes))
+	for idx, n := range h.actionnodes {
 		if n.isIdle {
 
 			if time.Since(n.lastIdleCheckTime) > (IDLE_TIMEOUT_CLOUD_HOST * time.Second) {
@@ -86,8 +86,8 @@ func (h *Hub) checkIdleNodes() {
 
 		}
 
-		if n.PeerCount == 0 {
-			log.Infof("node is idle %v %v", n.Ip, n.Port)
+		if n.Tasks == 0 {
+			log.Infof("action node is idle %v %v", n.Ip, n.Port)
 			if !n.isIdle {
 				n.lastIdleCheckTime = time.Now()
 			}
@@ -95,23 +95,50 @@ func (h *Hub) checkIdleNodes() {
 		} else {
 			n.isIdle = false
 		}
-		h.nodes[idx] = n
+		h.actionnodes[idx] = n
 	}
 }
 
-func (h *Hub) checkDeadNodes() {
+func (h *Hub) checkDeadActionNodes() {
 	h.Lock()
 	defer h.Unlock()
 	//check dead nodes which are not clouds instances
-	for idx, n := range h.nodes {
+	for idx, n := range h.actionnodes {
 		if n.getCloudMachine(h) == nil {
 			log.Infof("node %v is not a cloud instance", n.Ip)
 
 			if time.Since(n.lastPing) > 15*time.Second {
 				log.Infof("removing dead node %v port %v", n.Ip, n.Port)
-				h.nodes = append(h.nodes[:idx], h.nodes[idx+1:]...)
+				h.actionnodes = append(h.actionnodes[:idx], h.actionnodes[idx+1:]...)
 				break
 			}
 		}
 	}
+}
+
+func (h *Hub) StartActionServerNotify(capacity int, notify chan<- string) bool {
+
+	m, err := StartInstance(capacity, -1, true)
+	if err != nil {
+		log.Errorf("unable to start server %v", err)
+		return false
+	} else {
+		h.Lock()
+		h.machines[m.Id] = m
+		h.lastMachineStarted[m.getIP()] = machineOnline{
+			time:         time.Now(),
+			shouldnotify: true,
+			notify:       notify,
+		}
+		h.Unlock()
+		// notify <- m.getIP() this is wrong. we are doing notify when we get ping from machine
+		time.AfterFunc(2*60*time.Second, func() {
+			h.Lock()
+			log.Infof("machine timeout starteding..... deleting it from here", m.getIP())
+			delete(h.lastMachineStarted, m.getIP())
+			h.Unlock()
+		})
+		return true
+	}
+
 }

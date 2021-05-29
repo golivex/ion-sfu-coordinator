@@ -21,6 +21,9 @@ type machine struct {
 func (m *machine) isSfu() bool {
 	return strings.Contains(m.getName(), "sfu-")
 }
+func (m *machine) isAction() bool {
+	return strings.Contains(m.getName(), "action-")
+}
 
 func (m *machine) toString() string {
 	return m.Name + " " + m.GetZone() + " " + m.getInstanceType()

@@ -15,10 +15,11 @@ type etcdCoordinator struct {
 	mu  sync.Mutex
 	cli *clientv3.Client
 
-	hosts    map[string]Host        `json:"hosts"`
-	sessions map[string]LiveSession `json:"sessions"`
-	cloud    *cloud.Hub
-	block    blockedSession
+	hosts       map[string]Host        `json:"hosts"`
+	sessions    map[string]LiveSession `json:"sessions"`
+	cloud       *cloud.Hub
+	block       blockedSession
+	actionhosts map[string]Host `json:"actions"`
 }
 
 func NewCoordinatorEtcd(host string) *etcdCoordinator {
@@ -34,9 +35,10 @@ func NewCoordinatorEtcd(host string) *etcdCoordinator {
 
 	log.Infof("created etcdCoordinator")
 	return &etcdCoordinator{
-		cli:      cli,
-		hosts:    make(map[string]Host),
-		sessions: make(map[string]LiveSession),
+		cli:         cli,
+		hosts:       make(map[string]Host),
+		actionhosts: make(map[string]Host),
+		sessions:    make(map[string]LiveSession),
 		block: blockedSession{
 			session: make(map[string]string),
 		},

@@ -6,6 +6,8 @@ ion-cluster
 ion-cluster/*
 ion-sfu
 ion-sfu/*
+actions/ion-sfu
+actions/ion-sfu/*
 ion-sdk-go
 ion-sdk-go/*
 webrtc

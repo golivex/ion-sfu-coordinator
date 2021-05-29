@@ -91,6 +91,8 @@ func InitWithAddress(session, session2, addr, addr2 string, cancel chan struct{}
 	log.Warnf("c2 joined %v session %v", addr2, session2)
 	log.Warnf("mirroring now")
 	ticker := time.NewTicker(10 * time.Second)
+
+	go e.Stats(3, cancel)
 	defer ticker.Stop()
 	for {
 		select {

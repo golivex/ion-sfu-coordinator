@@ -1,0 +1,12 @@
+version: "3.7"
+
+services:
+
+    actions:
+        image: xtechsample/actions
+        container_name: actions
+        command: ["-port", ":3050" , "-ipaddr" , "{ip}" , "-eaddr", "5.9.18.28:2379"]
+        restart: always
+        network_mode: host
+
+    

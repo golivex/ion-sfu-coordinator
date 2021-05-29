@@ -25,8 +25,9 @@ type ping struct {
 
 type Hub struct {
 	sync.Mutex
-	machines map[string]machine //machine are mainly cloud based instances
-	nodes    []node             // nodes are sfu nodes running on cloud and normal server instances, one server can have multiple nodes as well
+	machines    map[string]machine //machine are mainly cloud based instances
+	nodes       []node             // nodes are sfu nodes running on cloud and normal server instances, one server can have multiple nodes as well
+	actionnodes []actionnode
 
 	machinePingMap map[string]ping
 
@@ -82,7 +83,7 @@ func (h *Hub) startDefaultServer() {
 			h.cloudOp = true
 			h.Unlock()
 			go func() {
-				m, err := StartInstance(-1, -1)
+				m, err := StartInstance(-1, -1, false)
 				if err != nil {
 					log.Errorf("unable to start server %v", err)
 				} else {
@@ -112,7 +113,7 @@ func (h *Hub) StartServerNotify(capacity int, session string, notify chan<- stri
 		h.Lock()
 		h.cloudOp = true
 		h.Unlock()
-		m, err := StartInstance(capacity, -1)
+		m, err := StartInstance(capacity, -1, false)
 		if err != nil {
 			log.Errorf("unable to start server %v", err)
 			h.Lock()
@@ -142,7 +143,6 @@ func (h *Hub) StartServerNotify(capacity int, session string, notify chan<- stri
 		log.Infof("cannot start a new machine!")
 		return false
 	}
-
 }
 
 func (h *Hub) syncCloudMachines() {
@@ -174,74 +174,6 @@ func (h *Hub) syncCloudMachines() {
 			log.Infof("machine already exists %v", m.getIP())
 		}
 
-	}
-}
-
-func (h *Hub) checkIdleNodes() {
-	h.Lock()
-	defer h.Unlock()
-	log.Infof("checking idle nodes %v", len(h.nodes))
-	for idx, n := range h.nodes {
-		if n.isIdle {
-
-			if time.Since(n.lastIdleCheckTime) > (IDLE_TIMEOUT_CLOUD_HOST * time.Second) {
-
-				//check if all nodes are idle for this specific ip
-				// as we can have multiple nodes on a single ip
-				all_idle := n.checkAllNodeIdle(h)
-				if all_idle {
-					//check if its a cloud instance
-					if n.isCloud(h) {
-						log.Infof("node is idle after %v sec delete it as its cloud instance", IDLE_TIMEOUT_CLOUD_HOST)
-						m := n.getCloudMachine(h)
-						if m != nil {
-							if len(h.machines) > MINIMUM_CLOUD_HOSTS {
-								log.Infof("deleting host %v", m.getIP())
-								go DeleteInstance(*m)
-								//TODO need to see how we can delete avaiable host here instance maybe even use etcd?
-								delete(h.machines, m.Id)
-							} else {
-								log.Infof("cannot delete cloud instance as minimum of %v instances required", MINIMUM_CLOUD_HOSTS)
-							}
-						}
-					} else {
-						log.Infof("node is idle after %v sec but its not a cloud instance", IDLE_TIMEOUT_CLOUD_HOST)
-					}
-
-				} else {
-					log.Infof("all nodes on this ip are not idle so cannot delete this server %v", n.Ip)
-				}
-			}
-
-		}
-
-		if n.PeerCount == 0 {
-			log.Infof("node is idle %v %v", n.Ip, n.Port)
-			if !n.isIdle {
-				n.lastIdleCheckTime = time.Now()
-			}
-			n.isIdle = true
-		} else {
-			n.isIdle = false
-		}
-		h.nodes[idx] = n
-	}
-}
-
-func (h *Hub) checkDeadNodes() {
-	h.Lock()
-	defer h.Unlock()
-	//check dead nodes which are not clouds instances
-	for idx, n := range h.nodes {
-		if n.getCloudMachine(h) == nil {
-			log.Infof("node %v is not a cloud instance", n.Ip)
-
-			if time.Since(n.lastPing) > 15*time.Second {
-				log.Infof("removing dead node %v port %v", n.Ip, n.Port)
-				h.nodes = append(h.nodes[:idx], h.nodes[idx+1:]...)
-				break
-			}
-		}
 	}
 }
 
@@ -334,9 +266,11 @@ func (h *Hub) autoScaleNodes(ctx context.Context) {
 
 		case <-ticker.C:
 			log.Infof("auto scaling nodes")
-			h.checkDeadNodes()
 			h.checkDeadMachines()
+			h.checkDeadNodes()
 			h.checkIdleNodes()
+			h.checkDeadActionNodes()
+			h.checkIdleActionNodes()
 			h.scaleNodeLoad()
 		}
 	}
@@ -349,6 +283,41 @@ func (h *Hub) DeleteNode(ip string, port string) {
 			h.nodes = append(h.nodes[:idx], h.nodes[idx+1:]...)
 			break
 		}
+	}
+}
+
+func (hub *Hub) UpdateActionNodeLoad(ip string, port string, tasks int, cpu float64) {
+	// log.Infof("updating action node load ip%v port%v tasks %v cpu %v", ip, port, tasks, cpu)
+	if len(hub.lastMachineStarted) > 0 {
+		online, ok := hub.lastMachineStarted[ip]
+		if ok {
+			log.Infof("last machine started is online! %v took time %v", ip, time.Since(online.time))
+			if online.shouldnotify {
+				online.notify <- ip
+			}
+			delete(hub.lastMachineStarted, ip)
+		}
+	}
+	found := false
+	for idx, n := range hub.actionnodes {
+
+		if n.Ip == ip && n.Port == port {
+			n.Tasks = tasks
+			n.Cpu = cpu
+			n.lastPing = time.Now()
+			hub.actionnodes[idx] = n
+			found = true
+			break
+		}
+	}
+	if !found {
+		hub.actionnodes = append(hub.actionnodes, actionnode{
+			Ip:       ip,
+			Port:     port,
+			Tasks:    tasks,
+			Cpu:      cpu,
+			lastPing: time.Now(),
+		})
 	}
 }
 

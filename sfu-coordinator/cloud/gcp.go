@@ -60,7 +60,7 @@ func GetInstanceCapablity(mtype string) int {
 	return -1
 }
 
-func StartInstance(capacity int, zoneidx int) (machine, error) {
+func StartInstance(capacity int, zoneidx int, isaction bool) (machine, error) {
 	var m machine
 	ex := GetInstanceList()
 	if len(ex) >= MAX_CLOUD_HOSTS {
@@ -97,7 +97,15 @@ func StartInstance(capacity int, zoneidx int) (machine, error) {
 		}
 	}
 	log.Infof("starting server with capacity %v for machine_type %v", capacity, machine_type)
-	name = "sfu-" + name
+	if isaction {
+		name = "action-" + name
+	} else {
+		name = "sfu-" + name
+	}
+	startupscript := "startup-script=./cloud/scripts/imagestartup.sh"
+	if isaction {
+		startupscript = "startup-script=./cloud/scripts/actionstartup.sh"
+	}
 	output, err := exec.Command(
 		"gcloud", "beta", "compute", "instances", "create", name,
 		"--zone="+zone,
@@ -108,7 +116,7 @@ func StartInstance(capacity int, zoneidx int) (machine, error) {
 		// "--image-project=ubuntu-os-cloud",
 		"--maintenance-policy=TERMINATE",
 		"--boot-disk-type=pd-ssd",
-		"--metadata-from-file", "startup-script=./cloud/scripts/imagestartup.sh",
+		"--metadata-from-file", startupscript,
 		// "--metadata-from-file", "startup-script=./cloud/scripts/startup.sh",
 		"--create-disk", "size=100GB,type=pd-ssd,auto-delete=yes", "--format=json").Output() //--scopes=logging-write,compute-rw,cloud-platform
 
@@ -122,7 +130,7 @@ func StartInstance(capacity int, zoneidx int) (machine, error) {
 
 	if err != nil {
 		log.Errorf("StartServer", err)
-		return StartInstance(capacity, zoneidx+1)
+		return StartInstance(capacity, zoneidx+1, isaction)
 	}
 	// log.Debugf("output %v", string(output))
 
@@ -154,7 +162,7 @@ func GetInstanceList() []machine {
 
 	var sfum []machine
 	for _, m := range machines {
-		if m.isSfu() && m.IsRunning() {
+		if (m.isSfu() || m.isAction()) && m.IsRunning() {
 			m.CreationTimestamp = m.CreationTimestamp.In(loc)
 			// log.Infof("found instance %v", m.toString())
 			sfum = append(sfum, m)

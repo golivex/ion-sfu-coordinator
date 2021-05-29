@@ -19,6 +19,7 @@ func main() {
 	go etcd.LoadSessions(ctx)
 	go etcd.LoadHosts(ctx)
 	go etcd.WatchHosts(ctx)
+	go etcd.WatchActionHosts(ctx)
 	go etcd.WatchSessions(ctx)
 	go etcd.WatchCurrentSessionMap(ctx)
 

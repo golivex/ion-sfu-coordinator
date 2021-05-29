@@ -8,47 +8,19 @@ import (
 	"github.com/lucsky/cuid"
 	connection "github.com/manishiitg/actions/connection"
 	client "github.com/manishiitg/actions/loadtest/client"
-	ilog "github.com/pion/ion-log"
+	log "github.com/pion/ion-log"
 	sdk "github.com/pion/ion-sdk-go"
 	"github.com/pion/webrtc/v3"
-	"github.com/sirupsen/logrus"
 )
 
-var (
-	log = ilog.NewLoggerWithFields(ilog.WarnLevel, "", nil)
-)
-
-func InitApi(session string, clients int, cancel chan struct{}) {
+func InitLoadTestApi(serverIp string, session string, clients int, role string, cycle int, rooms int, cancel chan struct{}) *sdk.Engine {
 	if clients == 0 {
 		clients = 1
 	}
-	Init("test", "http://0.0.0.0:4000/", session, clients, 1000, 60*60, "pubsub", true, true, "", "", -1, cancel, true)
-	//TODO
-	// tried os.exec also didn't work its not killing the process at all
-	// starting os.exec here because when we stop load test the session should get closed instantly buts its not getting closed
-	//even after trying a lot
-	// cmd := exec.Command("go", "run", "cmd/load.go", "-session", session, "-clients", strconv.Itoa(clients))
-	// err := cmd.Start()
-	// if err != nil {
-	// 	log.Infof("error in starting process %v", err)
-	// }
-	// log.Infof("process id %v", cmd.Process.Pid)
-	// for {
-	// 	select {
-	// 	case <-cancel:
-	// 		log.Infof("process cancel called")
-	// 		err := cmd.Process.Signal(syscall.SIGTERM)
-	// 		if err != nil {
-	// 			log.Infof("Unable to kill process %v", err)
-	// 		}
-	// 		return
-	// 	}
-
-	// }
+	return Init("./big-buck-bunny_trailer.webm", "http://"+serverIp+":4000/", session, clients, cycle, 60*60, role, true, true, "", "", rooms, cancel)
 }
 
-func Init(file, gaddr, session string, total, cycle, duration int, role string, video bool, audio bool, simulcast string, paddr string, create_room int, cancel chan struct{}, fromApi bool) {
-	log.SetLevel(logrus.WarnLevel)
+func Init(file, gaddr, session string, total, cycle, duration int, role string, video bool, audio bool, simulcast string, paddr string, create_room int, cancel chan struct{}) *sdk.Engine {
 	se := webrtc.SettingEngine{}
 	se.SetEphemeralUDPPortRange(10000, 15000)
 	webrtcCfg := webrtc.Configuration{
@@ -69,27 +41,20 @@ func Init(file, gaddr, session string, total, cycle, duration int, role string, 
 			Configuration: webrtcCfg,
 		},
 	}
-	if gaddr == "" {
-		log.Errorf("gaddr is \"\"!")
-		return
-	}
 	e := sdk.NewEngine(config)
 	if paddr != "" {
 		go e.ServePProf(paddr)
 	}
-	run(e, gaddr, session, file, role, total, duration, cycle, video, audio, simulcast, create_room, cancel, fromApi)
+	go run(e, gaddr, session, file, role, total, duration, cycle, video, audio, simulcast, create_room, cancel)
+	return e
 }
-
-func run(e *sdk.Engine, addr, session, file, role string, total, duration, cycle int, video, audio bool, simulcast string, create_room int, cancel chan struct{}, fromApi bool) {
+func run(e *sdk.Engine, addr, session, file, role string, total, duration, cycle int, video, audio bool, simulcast string, create_room int, cancel chan struct{}) *sdk.Engine {
 	log.Warnf("run session=%v file=%v role=%v total=%v duration=%v cycle=%v video=%v audio=%v simulcast=%v\n", session, file, role, total, duration, cycle, audio, video, simulcast)
 	timer := time.NewTimer(time.Duration(duration) * time.Second)
 
 	// defer recoverClose() //TODO see if this can be fixed from ion-sdk-go or debug how its happening https://github.com/pion/ion-sdk-go/issues/34
 
-	if !fromApi {
-		log.Warnf("starting stats %v", fromApi)
-		go e.Stats(3)
-	}
+	go e.Stats(3, cancel)
 
 	// var wg sync.WaitGroup
 	for i := 0; i < total; i++ {
@@ -208,6 +173,7 @@ func run(e *sdk.Engine, addr, session, file, role string, total, duration, cycle
 		}(i, session)
 		time.Sleep(time.Millisecond * time.Duration(cycle))
 	}
+	return e
 	// wg.Wait()
 
 }

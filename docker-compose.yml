@@ -9,48 +9,26 @@ services:
         # ports:
         #     - 2379:2379
 
-    # server:
-    #     container_name: server
-    #     build:
-<<<<<<< HEAD
-    #         context : ./sfu-coordinator
-    #     image: xtechsample/server-ion:latest
-    #     restart: always
-=======
-    #         context : ./server
-    #     image: xtechsample/server-ion:latest
-    #     restart: always
-    #     environment:
-    #         - ETCD=http://0.0.0.0:2379
-    #         - LEASE_TEMP_TIMEOUT=5
-    #         - MAX_GCP_INSTANCES=0 # max number of gcp instances we can start
-    #         - MY_IP=5.9.18.28
-    #         - AUTO_SCALE_TIMEOUT=5000 # how long to wait before auto scaling starts
-    #         - GCP_DEAD_HOST_DELETE_WAIT=60 # how long to wait in sec before deleting a dead server
-    #         - GCP_EMPTY_SESSION_DELETE_WAIT=30 # how to long to wait in sec before deleting a empty session server
-    #         - MINIMUM_HOSTS=1
->>>>>>> 27e562cda2809321aeb24bb6a225ce9319718766
-    #     network_mode: host
-    #     depends_on:
-    #         - etcd
+    server:
+        image: xtechsample/server
+        container_name: server
+        build:
+            context : ./sfu-coordinator
+        image: xtechsample/server-ion:latest
+        restart: always
+        network_mode: host
+        depends_on:
+            - etcd
 
-    # actions:
-    #     build:
-    #         context : pion-tools/actions
-    #     restart: always
-    #     network_mode: host
+    actions:
+        image: xtechsample/actions
+        container_name: actions
+        build:
+            context : actions
+        command: ["-port", ":3050" , "-ipaddr" , "5.9.18.28" , "-eaddr", "5.9.18.28:2379"]
+        restart: always
+        network_mode: host
 
-<<<<<<< HEAD
-=======
-    # prometheus:
-    #     image: prom/prometheus:latest
-    #     # ports:
-    #     #     - 9090:9090
-    #     network_mode: host
-    #     volumes:
-    #         - "./cfgs/prometheus.yml:/etc/prometheus/prometheus.yml"
-
->>>>>>> 27e562cda2809321aeb24bb6a225ce9319718766
     
     sfu:
         image: xtechsample/ion-sfu:latest-allrpc
