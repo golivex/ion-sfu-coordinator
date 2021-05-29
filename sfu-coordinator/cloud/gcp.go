@@ -19,7 +19,7 @@ func getZone() []string {
 	return []string{"asia-south1-a", "asia-south1-b", "asia-south1-c", "asia-east1-a", "asia-east1-b", "asia-east1-c", "us-central1-a", "us-central1-b"}
 }
 
-// n1-standard-1 $0.04749975
+// n1-standard-1 $0.04749975 almost 200 subscribers, but if 1 publishers than 150 and if 2 publishers than 100-150 subscribers
 // n1-standard-2 $0.0949995
 // n1-standard-4 $0.189999
 // n1-standard-8 $0.379998
@@ -61,7 +61,6 @@ func GetInstanceCapablity(mtype string) int {
 }
 
 func StartInstance(capacity int, zoneidx int) (machine, error) {
-
 	var m machine
 	ex := GetInstanceList()
 	if len(ex) >= MAX_CLOUD_HOSTS {
@@ -97,6 +96,7 @@ func StartInstance(capacity int, zoneidx int) (machine, error) {
 			machine_type = DEFAULT_MACHINE_TYPE
 		}
 	}
+	log.Infof("starting server with capacity %v for machine_type %v", capacity, machine_type)
 	name = "sfu-" + name
 	output, err := exec.Command(
 		"gcloud", "beta", "compute", "instances", "create", name,

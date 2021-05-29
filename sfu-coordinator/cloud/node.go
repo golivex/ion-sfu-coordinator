@@ -18,7 +18,9 @@ type node struct {
 
 func (n *node) isCloud(h *Hub) bool {
 	cloud := false
+	log.Infof("checking machines %v", len(h.machines))
 	for _, m := range h.machines {
+		log.Infof("m get ip %v nip %v", m.getIP(), n.Ip)
 		if m.getIP() == n.Ip {
 			cloud = true
 		}

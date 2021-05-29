@@ -12,6 +12,12 @@ var CAPABLITY = map[string]int{
 	"5.9.18.28": 200,
 }
 
+const IDLE_TIMEOUT_CLOUD_HOST = 60
+const WAIT_TIMEOUT_DELETE_CLOUD_DEAD = 15
+const MAX_MACHINE_LOAD = 70
+const MINIMUM_CLOUD_HOSTS = 0
+const MAX_CLOUD_HOSTS = 3
+
 type ping struct {
 	isDead          bool
 	lastIsDeadCheck time.Time
@@ -44,7 +50,7 @@ func RegisterHub(ctx context.Context) *Hub {
 	go h.autoScaleNodes(ctx)
 	go h.syncCloudMachines()
 
-	ticker := time.NewTicker(10 * time.Second)
+	ticker := time.NewTicker(30 * time.Second)
 
 	go func() {
 		for {
@@ -60,12 +66,6 @@ func RegisterHub(ctx context.Context) *Hub {
 
 	return h
 }
-
-const IDLE_TIMEOUT_CLOUD_HOST = 60
-const WAIT_TIMEOUT_DELETE_CLOUD_DEAD = 15
-const MAX_MACHINE_LOAD = 70
-const MINIMUM_CLOUD_HOSTS = 0
-const MAX_CLOUD_HOSTS = 2
 
 func (h *Hub) startDefaultServer() {
 	h.Lock()
@@ -107,33 +107,41 @@ func (h *Hub) startDefaultServer() {
 		}
 	}
 }
-func (h *Hub) StartServerNotify(capacity int, session string, notify chan<- string) {
-	h.Lock()
-	h.cloudOp = true
-	h.Unlock()
-	m, err := StartInstance(capacity, -1)
-	if err != nil {
-		log.Errorf("unable to start server %v", err)
-	} else {
+func (h *Hub) StartServerNotify(capacity int, session string, notify chan<- string) bool {
+	if h.CanAddMachine() {
 		h.Lock()
-		h.machines[m.Id] = m
-		h.lastMachineStarted[m.getIP()] = machineOnline{
-			time:         time.Now(),
-			shouldnotify: true,
-			notify:       notify,
-		}
+		h.cloudOp = true
 		h.Unlock()
-		// notify <- m.getIP() this is wrong. we are doing notify when we get ping from machine
-		time.AfterFunc(2*60*time.Second, func() {
+		m, err := StartInstance(capacity, -1)
+		if err != nil {
+			log.Errorf("unable to start server %v", err)
 			h.Lock()
-			log.Infof("machine timeout starteding..... deleting it from here", m.getIP())
-			delete(h.lastMachineStarted, m.getIP())
+			h.cloudOp = false
 			h.Unlock()
-		})
+			return false
+		} else {
+			h.Lock()
+			h.cloudOp = false
+			h.machines[m.Id] = m
+			h.lastMachineStarted[m.getIP()] = machineOnline{
+				time:         time.Now(),
+				shouldnotify: true,
+				notify:       notify,
+			}
+			h.Unlock()
+			// notify <- m.getIP() this is wrong. we are doing notify when we get ping from machine
+			time.AfterFunc(2*60*time.Second, func() {
+				h.Lock()
+				log.Infof("machine timeout starteding..... deleting it from here", m.getIP())
+				delete(h.lastMachineStarted, m.getIP())
+				h.Unlock()
+			})
+			return true
+		}
+	} else {
+		log.Infof("cannot start a new machine!")
+		return false
 	}
-	h.Lock()
-	h.cloudOp = false
-	h.Unlock()
 
 }
 
@@ -184,18 +192,20 @@ func (h *Hub) checkIdleNodes() {
 				if all_idle {
 					//check if its a cloud instance
 					if n.isCloud(h) {
-						log.Infof("node is idle after 20 sec delete it as its cloud instance")
+						log.Infof("node is idle after %v sec delete it as its cloud instance", IDLE_TIMEOUT_CLOUD_HOST)
 						m := n.getCloudMachine(h)
 						if m != nil {
 							if len(h.machines) > MINIMUM_CLOUD_HOSTS {
+								log.Infof("deleting host %v", m.getIP())
 								go DeleteInstance(*m)
+								//TODO need to see how we can delete avaiable host here instance maybe even use etcd?
 								delete(h.machines, m.Id)
 							} else {
 								log.Infof("cannot delete cloud instance as minimum of %v instances required", MINIMUM_CLOUD_HOSTS)
 							}
 						}
 					} else {
-						log.Infof("node is idle after 20 sec but its not a cloud instance")
+						log.Infof("node is idle after %v sec but its not a cloud instance", IDLE_TIMEOUT_CLOUD_HOST)
 					}
 
 				} else {
@@ -344,7 +354,7 @@ func (h *Hub) DeleteNode(ip string, port string) {
 
 func (hub *Hub) UpdateNodeLoad(ip string, port string, peer int, cpu float64) {
 
-	log.Infof("updating host load ip%v port%v peer %v cpu%v", ip, port, peer, cpu)
+	// log.Infof("updating host load ip%v port%v peer %v cpu%v", ip, port, peer, cpu)
 
 	if len(hub.lastMachineStarted) > 0 {
 		online, ok := hub.lastMachineStarted[ip]
@@ -384,6 +394,7 @@ func (h *Hub) CanAddMachine() bool {
 	if h.cloudOp {
 		em = em + 1
 	}
+	log.Infof("add machine calc len(machines) %v  len(lastMachineStarted) %v cloudOp %v final count %v MAX_CLOUD_HOSTS %v", len(h.machines), len(h.lastMachineStarted), h.cloudOp, em, MAX_CLOUD_HOSTS)
 
 	return em < MAX_CLOUD_HOSTS
 }

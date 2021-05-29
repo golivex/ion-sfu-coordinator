@@ -14,10 +14,11 @@ import (
 type HostResponse struct {
 	Host    string
 	Session string
+	Status  string
 	Publish bool //not using this as of now as purpose of load test will fail
 }
 
-func GetHost(addr string, new_session string, notify chan string, cancel chan struct{}) {
+func GetHost(addr string, new_session string, notify chan string, cancel chan struct{}, role string) {
 
 	// notify <- "0.0.0.0:50052"
 
@@ -25,14 +26,14 @@ func GetHost(addr string, new_session string, notify chan string, cancel chan st
 	for {
 		select {
 		case <-done:
-			log.Warnf("get host done!")
+			// log.Warnf("get host done!")
 			return
 		case <-cancel:
 			log.Warnf("get host cancelled, cleanup")
 			return
 		default:
-			log.Warnf("getting sfu from %v", addr)
-			resp, err := http.Get(addr + "session/" + new_session)
+			// log.Warnf("getting sfu from %v", addr)
+			resp, err := http.Get(addr + "session/" + new_session + "?role=" + role)
 			if err != nil {
 				log.Errorf("%v", err)
 				time.Sleep(10 * time.Second)
@@ -48,15 +49,15 @@ func GetHost(addr string, new_session string, notify chan string, cancel chan st
 						log.Errorf("error parsing host response", err)
 					}
 					sfu_host := response.Host
-					log.Warnf("response %v", response)
+					log.Warnf("response %v", response, " status %v", response.Status)
 					if sfu_host == "NO_HOSTS_RETRY" {
-						fmt.Println("waiting for host to get ready!")
+						// fmt.Println("waiting for host to get ready!")
 						time.Sleep(2 * time.Second)
 					} else if sfu_host == "SERVER_LOAD" {
-						fmt.Println("server is underload need to wait before joining call!")
+						// fmt.Println("server is underload need to wait before joining call!")
 						time.Sleep(2 * time.Second)
 					} else if len(sfu_host) == 0 {
-						fmt.Println("host not found")
+						// fmt.Println("host not found")
 						time.Sleep(2 * time.Second)
 					} else {
 						sfu_host = strings.Replace(sfu_host, "700", "5005", -1)

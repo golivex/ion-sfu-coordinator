@@ -36,6 +36,7 @@ func (e *etcdCoordinator) InitApi() {
 		}
 		capacity := c.Query("capacity")
 		cap := -1
+		role := c.Query("role")
 
 		if len(capacity) > 0 {
 			x, err := strconv.Atoi(capacity)
@@ -44,7 +45,7 @@ func (e *etcdCoordinator) InitApi() {
 			}
 		}
 
-		host := e.FindHost(id, cap)
+		host := e.FindHost(id, cap, role)
 		c.JSON(200, host)
 	})
 	r.GET("/stopload", func(c *gin.Context) {

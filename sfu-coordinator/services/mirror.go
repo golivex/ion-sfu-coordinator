@@ -178,7 +178,7 @@ func (sfu SfuScaler) GetOptimalSourceHost(session string) *Host {
 	return min_load_host
 }
 
-func (sfu SfuScaler) FindOptmialHost(session string, e *etcdCoordinator) (*Host, string) {
+func (sfu SfuScaler) FindOptmialHost(session string, e *etcdCoordinator, role string) (*Host, string) {
 	sfu.mu.Lock()
 	defer sfu.mu.Unlock()
 	log.Infof("finding optmizal host for %v", session)
@@ -206,7 +206,7 @@ func (sfu SfuScaler) FindOptmialHost(session string, e *etcdCoordinator) (*Host,
 	var optmialhost *Host
 	opsession := ""
 	for name, host := range allhosts {
-		if canServe, _ := e.canHostServe(host); canServe {
+		if canServe, _ := e.canHostServe(host, role); canServe {
 			optmialhost = host
 			opsession = name
 			break

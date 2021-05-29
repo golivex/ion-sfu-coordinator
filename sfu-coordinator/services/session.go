@@ -31,19 +31,26 @@ type Peer struct {
 	Tracks []Track
 }
 
+func (s *LiveSession) sessionExistsInHost(e *etcdCoordinator) bool {
+	exist := false
+	for _, host := range e.hosts {
+		if host.Ip == s.Host && host.Port == s.Port {
+			exist = true
+			break
+		}
+	}
+	return exist
+}
+func (s *LiveSession) sessionInHost(host *Host) bool {
+	return s.Host == host.Ip && s.Port == host.Port
+}
+
 func (e *etcdCoordinator) deleteOrphanSession() {
 	e.mu.Lock()
 
 	log.Infof("deleteOrphanSession")
 	for key, session := range e.sessions {
-		exist := false
-		for _, host := range e.hosts {
-			if host.Ip == session.Host && host.Port == session.Port {
-				exist = true
-				break
-			}
-		}
-		if !exist {
+		if !session.sessionExistsInHost(e) {
 			// log.Infof("orphan session found %v", session.Name)
 			delete(e.sessions, key)
 		}
@@ -51,14 +58,14 @@ func (e *etcdCoordinator) deleteOrphanSession() {
 	e.mu.Unlock()
 }
 
-func (e *etcdCoordinator) deleteSessionsForHost(host string) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
+func (e *etcdCoordinator) deleteSessionsForHost(host *Host) {
+	//no need to lock as its call from delete host which already has lock
 
-	log.Infof("deleteSessionsForHost %v", host)
-	for key, _ := range e.sessions {
-		if strings.Index(key, host) != -1 {
+	log.Infof("deleteSessionsForHost %v", host.String())
+	for key, s := range e.sessions {
+		if s.sessionInHost(host) {
 			delete(e.sessions, key)
+			break
 		}
 	}
 	e.updateHostSessions()

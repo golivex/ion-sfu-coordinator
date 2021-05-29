@@ -12,6 +12,11 @@ services:
     # server:
     #     container_name: server
     #     build:
+<<<<<<< HEAD
+    #         context : ./sfu-coordinator
+    #     image: xtechsample/server-ion:latest
+    #     restart: always
+=======
     #         context : ./server
     #     image: xtechsample/server-ion:latest
     #     restart: always
@@ -24,6 +29,7 @@ services:
     #         - GCP_DEAD_HOST_DELETE_WAIT=60 # how long to wait in sec before deleting a dead server
     #         - GCP_EMPTY_SESSION_DELETE_WAIT=30 # how to long to wait in sec before deleting a empty session server
     #         - MINIMUM_HOSTS=1
+>>>>>>> 27e562cda2809321aeb24bb6a225ce9319718766
     #     network_mode: host
     #     depends_on:
     #         - etcd
@@ -34,6 +40,8 @@ services:
     #     restart: always
     #     network_mode: host
 
+<<<<<<< HEAD
+=======
     # prometheus:
     #     image: prom/prometheus:latest
     #     # ports:
@@ -42,6 +50,7 @@ services:
     #     volumes:
     #         - "./cfgs/prometheus.yml:/etc/prometheus/prometheus.yml"
 
+>>>>>>> 27e562cda2809321aeb24bb6a225ce9319718766
     
     sfu:
         image: xtechsample/ion-sfu:latest-allrpc

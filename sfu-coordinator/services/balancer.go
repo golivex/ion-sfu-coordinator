@@ -18,7 +18,7 @@ const CAN_HOST_MIRROR = false
 const MAX_TRACKS_PER_HOST = 9999      //if more than X tracks cannot connect to host at all
 const MAX_PUBLISH_TRACK_THRESH = 9999 //if more than X tracks cannot publish anymore, can only subscribe
 
-const MAX_CPULOAD_PER_HOST = 80       // if more than X cpu load, cannot connect to the host at all until load goes down
+const MAX_CPULOAD_PER_HOST = 85       // if more than X cpu load, cannot connect to the host at all until load goes down, also load goes down over a period of time
 const MAX_PUBLISH_CPULOAD_THRESH = 70 // if more than X cpu, cannot publish can only subscribe
 
 type HostReply struct {
@@ -44,12 +44,18 @@ type HostSession struct {
 	name string
 }
 
-func (e *etcdCoordinator) FindHost(session string, capacity int) HostReply {
+func (e *etcdCoordinator) FindHost(session string, capacity int, role string) HostReply {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
+	if role == "" {
+		role = "pubsub"
+		//allowed roles is pubsub/sub/pub
+	}
 	if capacity == -1 {
 		capacity = DEFAULT_CAPACITY
+	} else {
+		log.Infof("got capacity %v", capacity)
 	}
 
 	if len(e.hosts) == 0 {
@@ -139,17 +145,27 @@ func (e *etcdCoordinator) FindHost(session string, capacity int) HostReply {
 		if host != nil {
 			status = "SESSION_ASSIGNED_RECENTLY"
 		} else {
-			host = e.allocateHostToSession(session, capacity)
-			if host == nil {
-				if e.cloud != nil {
-					if e.cloud.CanAddMachine() {
-						if !e.startServerAndBlockSession(session, capacity) {
-							return HostReply{
-								Status: "HOST_LOAD_EXECEEDED_SCALING_NEW",
+			if e.isHostBlockedBySession(session) {
+				return HostReply{
+					Status: "SERVER_PROVISIONING",
+				}
+			} else {
+				host = e.allocateHostToSession(session, capacity)
+				if host == nil {
+					if e.cloud != nil {
+						if e.cloud.CanAddMachine() {
+							if !e.startServerAndBlockSession(session, capacity) {
+								return HostReply{
+									Status: "HOST_LOAD_EXECEEDED_SCALING_NEW",
+								}
+							} else {
+								return HostReply{
+									Status: "HOST_LOAD_EXECEEDED_SCALING_NEW_PROVISIONING",
+								}
 							}
 						} else {
 							return HostReply{
-								Status: "HOST_LOAD_EXECEEDED_SCALING_NEW_PROVISIONING",
+								Status: "HOST_UNAVAILABLE",
 							}
 						}
 					} else {
@@ -157,25 +173,24 @@ func (e *etcdCoordinator) FindHost(session string, capacity int) HostReply {
 							Status: "HOST_UNAVAILABLE",
 						}
 					}
-				} else {
-					return HostReply{
-						Status: "HOST_UNAVAILABLE",
-					}
-				}
 
-			} else {
-				status = NEW_HOST_ASSIGNED_SESSION
+				} else {
+					status = NEW_HOST_ASSIGNED_SESSION
+				}
 			}
 		}
 	}
-	if canServe, canPublish := e.canHostServe(host); canServe {
-		e.SpikeHost(host)
-		e.blockHostCapacity(session, host, capacity)
-		if e.ThrottleHost(host) {
+	if canServe, canPublish := e.canHostServe(host, role); canServe {
+		log.Infof("canServe %v canPublish %v", canServe, canPublish)
+		if role == "pubsub" || role == "pub" {
+			e.blockHostCapacity(session, host, capacity)
+		}
+		if e.ThrottleHost(host, role) {
 			return HostReply{
 				Status: "HOST_THROTTLE",
 			}
 		} else {
+			e.SpikeHost(host, role)
 			return HostReply{
 				Host:    host.String(),
 				Status:  status,
@@ -206,6 +221,7 @@ func (e *etcdCoordinator) FindHost(session string, capacity int) HostReply {
 		// 		}
 		// 	}
 		// }
+		log.Infof("host load execeeded host cannot serve")
 		return HostReply{
 			Status: "HOST_LOAD_EXCEED",
 		}
@@ -213,9 +229,9 @@ func (e *etcdCoordinator) FindHost(session string, capacity int) HostReply {
 	}
 }
 
-func (e *etcdCoordinator) canHostServe(host *Host) (canServe bool, canPublish bool) {
+func (e *etcdCoordinator) canHostServe(host *Host, role string) (canServe bool, canPublish bool) {
 
-	log.Infof("checking can host server for %v", *host)
+	log.Debugf("checking can host server for %v", *host)
 
 	log.Infof("(host.AudioTracks + host.VideoTracks) %v host %v host.GetCurrentLoad() %v", (host.AudioTracks + host.VideoTracks), host.String(), host.GetCurrentLoad())
 	spikepeer, spiketracks, spikecpu := e.GetSpikeLoad(*host)
@@ -223,7 +239,7 @@ func (e *etcdCoordinator) canHostServe(host *Host) (canServe bool, canPublish bo
 	log.Infof("Extra spike load %v %v %v", spikepeer, spiketracks, spikecpu)
 
 	if (cpu + spikecpu) > MAX_CPULOAD_PER_HOST {
-		log.Infof("cpu load already at max host cannot server cpu %v  max load %v", (cpu + spikecpu), MAX_CPULOAD_PER_HOST)
+		log.Infof("cpu load already at max host cannot serve real load %v cpu %v  max load %v", cpu, (cpu + spikecpu), MAX_CPULOAD_PER_HOST)
 		return false, false
 	} else {
 
@@ -233,12 +249,12 @@ func (e *etcdCoordinator) canHostServe(host *Host) (canServe bool, canPublish bo
 		} else {
 
 			trackload := (host.AudioTracks + host.VideoTracks + spiketracks)
-			if trackload >= MAX_TRACKS_PER_HOST {
+			if trackload >= MAX_TRACKS_PER_HOST && (role == "pubsub" || role == "pub") {
 				log.Infof("max tracks reached for this host tracks %v max tracks per host", trackload, MAX_TRACKS_PER_HOST)
 				return false, false
 			} else {
 
-				if trackload >= MAX_PUBLISH_TRACK_THRESH {
+				if trackload >= MAX_PUBLISH_TRACK_THRESH && (role == "pubsub" || role == "pub") {
 					log.Infof("max tracks reached for publishing host %v max tracks per host", trackload, MAX_TRACKS_PER_HOST)
 					return true, false
 				} else {
@@ -253,11 +269,12 @@ func (e *etcdCoordinator) canHostServe(host *Host) (canServe bool, canPublish bo
 	}
 }
 
-func (e *etcdCoordinator) findAvailableHost(existhost *Host) *Host {
+func (e *etcdCoordinator) findAvailableHost(existhost *Host, role string) *Host {
 	var fhost *Host
 	if existhost == nil {
 		for _, host := range e.hosts {
-			if canServe, _ := e.canHostServe(&host); canServe {
+			if canServe, canPublish := e.canHostServe(&host, role); canServe {
+				log.Infof("canServe %v canPublish %v", canServe, canPublish)
 				log.Infof("host willing to server found %v", host.String())
 				fhost = &host
 				break
@@ -266,7 +283,8 @@ func (e *etcdCoordinator) findAvailableHost(existhost *Host) *Host {
 	} else {
 		for _, host := range e.hosts {
 			if host.String() != existhost.String() {
-				if canServe, _ := e.canHostServe(&host); canServe {
+				if canServe, canPublish := e.canHostServe(&host, role); canServe {
+					log.Infof("canServe %v canPublish %v", canServe, canPublish)
 					log.Infof("host willing to server found %v", host.String())
 					fhost = &host
 					break
@@ -330,6 +348,7 @@ func (e *etcdCoordinator) allocateHostToSession(session string, capacity int) *H
 		}
 		if min_load > max_load {
 			min_load_host = nil
+
 		}
 	} else {
 		log.Infof("blocked host found for session %v host %v", session, blockedhost.String())

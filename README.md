@@ -41,6 +41,11 @@ also suppose we have an n1 server, and lot we get lot of connections. then cpu g
 we need to way to slow down how we give out hosts. and wait for actual cpu reply to come?
 
 
+<<<<<<< HEAD
+4.a) there another issues suppose we have instance with 16 cpu and one instance just 1 cpu. but 16 cpu cpu load is hight ets say only 10% but that 1 cpu is 1%, our algorightm will choose 1cpu. this is a problem... out assigning host algo should look at cpu load also
+
+=======
+>>>>>>> 27e562cda2809321aeb24bb6a225ce9319718766
 4) for live stream in which there is only publisher and multiple subscribers, we can forward sfu from one server to another. new users will have to wait till the new server is active. 
 
 5) in live stream, if we are doing live stream or recording etc we will start a new instance only for this purpose always
