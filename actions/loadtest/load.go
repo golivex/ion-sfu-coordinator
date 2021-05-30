@@ -37,7 +37,7 @@ func DownloadFile(filepath string, url string) error {
 	return err
 }
 
-func InitLoadTestApi(serverIp string, session string, clients int, role string, cycle int, rooms int, file string, cancel chan struct{}) *sdk.Engine {
+func InitLoadTestApi(serverIp string, session string, clients int, role string, cycle int, rooms int, file string, capacity int, cancel chan struct{}) *sdk.Engine {
 	if clients == 0 {
 		clients = 1
 	}
@@ -79,11 +79,23 @@ func InitLoadTestApi(serverIp string, session string, clients int, role string, 
 			}
 		}
 	}
+
+	if file == "h264" {
+		//TODO not working as of now need to debug
+		filepath = "/var/tmp/Jellyfish_360_10s_1MB.mp4"
+		if _, err := os.Stat(filepath); os.IsNotExist(err) {
+			err := DownloadFile(filepath, "https://test-videos.co.uk/vids/jellyfish/mp4/h264/360/Jellyfish_360_10s_1MB.mp4")
+			if err != nil {
+				log.Infof("error downloading file %v", err)
+				filepath = "test"
+			}
+		}
+	}
 	log.Infof("filepath %v", filepath)
-	return Init(filepath, serverIp, session, clients, cycle, 60*60, role, true, true, "", "", rooms, cancel)
+	return Init(filepath, serverIp, session, clients, cycle, 60*60, role, true, true, "", "", rooms, capacity, cancel)
 }
 
-func Init(file, gaddr, session string, total, cycle, duration int, role string, video bool, audio bool, simulcast string, paddr string, create_room int, cancel chan struct{}) *sdk.Engine {
+func Init(file, gaddr, session string, total, cycle, duration int, role string, video bool, audio bool, simulcast string, paddr string, create_room int, capacity int, cancel chan struct{}) *sdk.Engine {
 	se := webrtc.SettingEngine{}
 	se.SetEphemeralUDPPortRange(10000, 15000)
 	webrtcCfg := webrtc.Configuration{
@@ -108,14 +120,12 @@ func Init(file, gaddr, session string, total, cycle, duration int, role string, 
 	if paddr != "" {
 		go e.ServePProf(paddr)
 	}
-	go run(e, gaddr, session, file, role, total, duration, cycle, video, audio, simulcast, create_room, cancel)
+	go run(e, gaddr, session, file, role, total, duration, cycle, video, audio, simulcast, create_room, capacity, cancel)
 	return e
 }
-func run(e *sdk.Engine, addr, session, file, role string, total, duration, cycle int, video, audio bool, simulcast string, create_room int, cancel chan struct{}) *sdk.Engine {
+func run(e *sdk.Engine, addr, session, file, role string, total, duration, cycle int, video, audio bool, simulcast string, create_room int, capacity int, cancel chan struct{}) *sdk.Engine {
 	log.Warnf("run session=%v file=%v role=%v total=%v duration=%v cycle=%v video=%v audio=%v simulcast=%v\n", session, file, role, total, duration, cycle, audio, video, simulcast)
 	timer := time.NewTimer(time.Duration(duration) * time.Second)
-
-	// defer recoverClose() //TODO see if this can be fixed from ion-sdk-go or debug how its happening https://github.com/pion/ion-sdk-go/issues/34
 
 	go e.Stats(3, cancel)
 
@@ -130,7 +140,7 @@ func run(e *sdk.Engine, addr, session, file, role string, total, duration, cycle
 			}
 			notify := make(chan string, 1)
 
-			go connection.GetHost(addr, new_session, notify, cancel, role)
+			go connection.GetHost(addr, new_session, notify, cancel, role, capacity)
 			sfu_host := <-notify
 
 			if strings.Index(sfu_host, "=") != -1 {
@@ -146,7 +156,7 @@ func run(e *sdk.Engine, addr, session, file, role string, total, duration, cycle
 
 			switch crole {
 			case "pubsub":
-				var producer *client.GSTProducer
+
 				cid := fmt.Sprintf("%s_pubsub_%d_%s", new_session, i, cuid.New())
 				log.Errorf("AddClient session=%v clientid=%v addr=%v", new_session, cid, sfu_host)
 				c, err := sdk.NewClient(e, sfu_host, cid)
@@ -157,6 +167,7 @@ func run(e *sdk.Engine, addr, session, file, role string, total, duration, cycle
 				c.Join(new_session, nil)
 				defer e.DelClient(c)
 				if !strings.Contains(file, ".webm") {
+					var producer *client.GSTProducer
 					log.Warnf("starrting new gst producer")
 					if file == "test" {
 						producer = client.NewGSTProducer("video", "")
@@ -164,14 +175,33 @@ func run(e *sdk.Engine, addr, session, file, role string, total, duration, cycle
 						producer = client.NewGSTProducer("screen", file)
 					}
 					log.Warnf("publishing tracks")
-					go producer.Start()
-					defer producer.Stop()
+
 					t, _ := c.Publish(producer.VideoTrack())
+					go func() {
+						rtcpBuf := make([]byte, 1500)
+						for {
+							if _, _, rtcpErr := t.Sender().Read(rtcpBuf); rtcpErr != nil {
+								log.Errorf("videoSender rtcp error", err)
+								return
+							}
+						}
+					}()
 					defer c.UnPublish(t)
 					defer t.Stop()
 					t2, _ := c.Publish(producer.AudioTrack())
+					go func() {
+						rtcpBuf := make([]byte, 1500)
+						for {
+							if _, _, rtcpErr := t2.Sender().Read(rtcpBuf); rtcpErr != nil {
+								log.Errorf("videoSender rtcp error", err)
+								return
+							}
+						}
+					}()
 					defer c.UnPublish(t2)
 					defer t2.Stop()
+					go producer.Start()
+					defer producer.Stop()
 					log.Warnf("tracks published")
 				} else {
 					c.PublishWebm(file, video, audio)

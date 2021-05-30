@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,7 +19,7 @@ type HostResponse struct {
 	Publish bool //not using this as of now as purpose of load test will fail
 }
 
-func GetHost(addr string, new_session string, notify chan string, cancel chan struct{}, role string) {
+func GetHost(addr string, new_session string, notify chan string, cancel chan struct{}, role string, capacity int) {
 
 	// notify <- "0.0.0.0:50052"
 
@@ -33,7 +34,13 @@ func GetHost(addr string, new_session string, notify chan string, cancel chan st
 			return
 		default:
 			// log.Warnf("getting sfu from %v", addr)
-			resp, err := http.Get(addr + "session/" + new_session + "?role=" + role)
+			var resp *http.Response
+			var err error
+			if capacity == -1 {
+				resp, err = http.Get(addr + "session/" + new_session + "?role=" + role)
+			} else {
+				resp, err = http.Get(addr + "session/" + new_session + "?role=" + role + "&capacity=" + strconv.Itoa(capacity))
+			}
 			if err != nil {
 				log.Errorf("%v", err)
 				time.Sleep(10 * time.Second)

@@ -157,7 +157,7 @@ func (e *etcdCoordinator) InitApi() {
 			file = c.Query("file")
 		}
 
-		go e.simLoadForHost(c.Param("session"), c.Param("host"), c.Param("port"), no, role, cycle, rooms, file, 1)
+		go e.simLoadForHost(c.Param("session"), c.Param("host"), c.Param("port"), no, role, cycle, rooms, file, 1, -1)
 		c.Status(http.StatusOK)
 	})
 	// /session/test/node/5.9.18.28:7002/peer/ckoy35usg00080110qpo13b3v

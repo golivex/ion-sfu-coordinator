@@ -97,9 +97,6 @@ livestream on dev server with 500 users
 so 500 * 4 = 2k users can be handled on dev server itself
 
 
-Testing Videos
-================
-https://test-videos.co.uk/bigbuckbunny/webm-vp9
 
 
 export GO111MODULE=on

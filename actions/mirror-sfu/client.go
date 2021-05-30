@@ -117,8 +117,8 @@ func InitWithAddress(session, session2, addr, addr2 string, cancel chan struct{}
 }
 
 func Init(session, session2 string, cancel chan struct{}) {
-	notify := make(chan string)                                                        //TODO this pattern doesn't seem proper use context with cancel etc
-	go connection.GetHost("http://5.9.18.28:4000/", session, notify, cancel, "pubsub") //TODO hard coded host
+	notify := make(chan string)                                                            //TODO this pattern doesn't seem proper use context with cancel etc
+	go connection.GetHost("http://5.9.18.28:4000/", session, notify, cancel, "pubsub", -1) //TODO hard coded host
 	sfu_host := <-notify
 	if strings.Index(sfu_host, "=") != -1 {
 		session = strings.Split(sfu_host, "=")[1]
@@ -126,7 +126,7 @@ func Init(session, session2 string, cancel chan struct{}) {
 	}
 
 	notify2 := make(chan string)
-	go connection.GetHost("http://5.9.18.28:4000/", session2, notify2, cancel, "pubsub")
+	go connection.GetHost("http://5.9.18.28:4000/", session2, notify2, cancel, "pubsub", -1)
 	sfu_host2 := <-notify2
 	if strings.Index(sfu_host2, "=") != -1 {
 		session2 = strings.Split(sfu_host2, "=")[1]

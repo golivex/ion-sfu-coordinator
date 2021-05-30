@@ -33,7 +33,7 @@ func clientThread() {
 	log.Init(loglevel)
 
 	cancel := make(chan struct{})
-	go loadtest.Init(file, gaddr, session, total, cycle, duration, role, video, audio, simulcast, paddr, create_room, cancel)
+	go loadtest.Init(file, gaddr, session, total, cycle, duration, role, video, audio, simulcast, paddr, create_room, -1, cancel)
 	// Listen for signals
 
 }
