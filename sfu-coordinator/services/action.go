@@ -24,7 +24,7 @@ func (e *etcdCoordinator) checkActionNode(host string, port string) bool {
 	return true
 }
 
-func (e *etcdCoordinator) simLoad(session string, clients int, role string, cycle int, rooms int) string {
+func (e *etcdCoordinator) simLoad(session string, clients int, role string, cycle int, rooms int, file string) string {
 	actionhost := e.getReadyActionHost()
 	if actionhost == nil {
 		go func() {
@@ -36,17 +36,17 @@ func (e *etcdCoordinator) simLoad(session string, clients int, role string, cycl
 			if actionhost == nil {
 				panic("host cannot be nil!")
 			}
-			e.simLoadForHost(session, actionhost.Ip, actionhost.Port, clients, role, cycle, rooms)
+			e.simLoadForHost(session, actionhost.Ip, actionhost.Port, clients, role, cycle, rooms, file)
 		}()
 		return "NEW_CLOUD_HOST_STARTED"
 	} else {
-		e.simLoadForHost(session, actionhost.Ip, actionhost.Port, clients, role, cycle, rooms)
+		e.simLoadForHost(session, actionhost.Ip, actionhost.Port, clients, role, cycle, rooms, file)
 		return actionhost.String()
 	}
 }
 
-func (e *etcdCoordinator) simLoadForHost(session string, host string, port string, clients int, role string, cycle int, rooms int) string {
-	apiurl := "http://" + host + ":" + port + "/load/" + session + "?clients=" + strconv.Itoa(clients) + "&role=" + role + "&cycle=" + strconv.Itoa(cycle) + "&rooms=" + strconv.Itoa(rooms)
+func (e *etcdCoordinator) simLoadForHost(session string, host string, port string, clients int, role string, cycle int, rooms int, file string) string {
+	apiurl := "http://" + host + ":" + port + "/load/" + session + "?clients=" + strconv.Itoa(clients) + "&role=" + role + "&cycle=" + strconv.Itoa(cycle) + "&rooms=" + strconv.Itoa(rooms) + "&file=" + file
 	log.Infof("api called %v", apiurl)
 	resp, err := http.Get(apiurl)
 	if err != nil {

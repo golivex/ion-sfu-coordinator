@@ -16,7 +16,7 @@ func clientThread() {
 
 	var create_room = -1
 
-	flag.StringVar(&file, "file", "test", "Path to the file media")
+	flag.StringVar(&file, "file", "480p", "Path to the file media")
 	flag.StringVar(&gaddr, "gaddr", "http://0.0.0.0:4000/", "Ion-sfu grpc addr")
 	flag.StringVar(&session, "session", "test", "join session name")
 	flag.IntVar(&total, "clients", 1, "Number of clients to start")

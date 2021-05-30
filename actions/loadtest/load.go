@@ -2,6 +2,9 @@ package loadtest
 
 import (
 	"fmt"
+	"io"
+	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -13,11 +16,71 @@ import (
 	"github.com/pion/webrtc/v3"
 )
 
-func InitLoadTestApi(serverIp string, session string, clients int, role string, cycle int, rooms int, cancel chan struct{}) *sdk.Engine {
+func DownloadFile(filepath string, url string) error {
+
+	// Get the data
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	// Create the file
+	out, err := os.Create(filepath)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	// Write the body to file
+	_, err = io.Copy(out, resp.Body)
+	return err
+}
+
+func InitLoadTestApi(serverIp string, session string, clients int, role string, cycle int, rooms int, file string, cancel chan struct{}) *sdk.Engine {
 	if clients == 0 {
 		clients = 1
 	}
-	return Init("./big-buck-bunny_trailer.webm", "http://"+serverIp+":4000/", session, clients, cycle, 60*60, role, true, true, "", "", rooms, cancel)
+	filepath := "test"
+	if file == "default" {
+		filepath = "/var/tmp/Big_Buck_Bunny_4K.webm.360p.webm"
+		if _, err := os.Stat(filepath); os.IsNotExist(err) {
+			// filepath = "./video/big-buck-bunny_trailer.webm"
+			// if _, err := os.Stat(filepath); os.IsNotExist(err) {
+			// 	log.Infof("file doesn't exist switch to default")
+			// 	filepath = "test"
+			// }
+			err := DownloadFile(filepath, "https://upload.wikimedia.org/wikipedia/commons/transcoded/c/c0/Big_Buck_Bunny_4K.webm/Big_Buck_Bunny_4K.webm.360p.webm")
+			if err != nil {
+				log.Infof("error downloading file %v", err)
+				filepath = "test"
+			}
+
+		}
+	}
+	if file == "480p" {
+		filepath = "/var/tmp/Big_Buck_Bunny_4K.webm.480p.webm"
+		if _, err := os.Stat(filepath); os.IsNotExist(err) {
+			err := DownloadFile(filepath, "https://upload.wikimedia.org/wikipedia/commons/transcoded/c/c0/Big_Buck_Bunny_4K.webm/Big_Buck_Bunny_4K.webm.480p.webm")
+			if err != nil {
+				log.Infof("error downloading file %v", err)
+				filepath = "test"
+			}
+		}
+	}
+
+	if file == "720p" {
+		filepath = "/var/tmp/Big_Buck_Bunny_4K.webm.720p.webm"
+		if _, err := os.Stat(filepath); os.IsNotExist(err) {
+			err := DownloadFile(filepath, "https://upload.wikimedia.org/wikipedia/commons/transcoded/c/c0/Big_Buck_Bunny_4K.webm/Big_Buck_Bunny_4K.webm.720p.webm")
+			if err != nil {
+				log.Infof("error downloading file %v", err)
+				filepath = "test"
+			}
+		}
+	}
+	log.Infof("filepath %v", filepath)
+	return Init(filepath, "http://"+serverIp+":4000/", session, clients, cycle, 60*60, role, true, true, "", "", rooms, cancel)
 }
 
 func Init(file, gaddr, session string, total, cycle, duration int, role string, video bool, audio bool, simulcast string, paddr string, create_room int, cancel chan struct{}) *sdk.Engine {

@@ -75,6 +75,13 @@ func (e *etcdCoordinator) InitApi() {
 			role = "sub"
 		}
 
+		file := c.Query("file")
+		if len(file) == 0 {
+			file = "default"
+		} else {
+			file = c.Query("file")
+		}
+
 		qcycle := c.Query("cycle")
 		cycle := 0
 		if len(qcycle) != 0 {
@@ -93,7 +100,7 @@ func (e *etcdCoordinator) InitApi() {
 			}
 		}
 
-		resp := e.simLoad(c.Param("session"), no, role, cycle, rooms)
+		resp := e.simLoad(c.Param("session"), no, role, cycle, rooms, file)
 		c.JSON(http.StatusOK, gin.H{
 			"Response": resp,
 		})
@@ -132,7 +139,15 @@ func (e *etcdCoordinator) InitApi() {
 				rooms = x
 			}
 		}
-		go e.simLoadForHost(c.Param("session"), c.Param("host"), c.Param("port"), no, role, cycle, rooms)
+
+		file := c.Query("file")
+		if len(file) == 0 {
+			file = "default"
+		} else {
+			file = c.Query("file")
+		}
+
+		go e.simLoadForHost(c.Param("session"), c.Param("host"), c.Param("port"), no, role, cycle, rooms, file)
 		c.Status(http.StatusOK)
 	})
 	// /session/test/node/5.9.18.28:7002/peer/ckoy35usg00080110qpo13b3v
