@@ -33,7 +33,7 @@ func GetHost(addr string, new_session string, notify chan string, cancel chan st
 			log.Warnf("get host cancelled, cleanup")
 			return
 		default:
-			// log.Warnf("getting sfu from %v", addr)
+			// log.Warnf("getting sfu from %v for capacity %v", addr, capacity)
 			var resp *http.Response
 			var err error
 			if capacity == -1 {

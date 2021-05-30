@@ -19,6 +19,10 @@ type actionnode struct {
 	lastPing          time.Time
 }
 
+func (h *Hub) GetMaxActionMachines() int {
+	return MAX_CLOUD_ACTION_MACHINES
+}
+
 func (n *actionnode) isCloud(h *Hub) bool {
 	cloud := false
 	log.Infof("checking machines %v", len(h.machines))

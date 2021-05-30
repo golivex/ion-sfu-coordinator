@@ -43,12 +43,12 @@ func (e *etcdCoordinator) simLoad(session string, clients int, role string, cycl
 	} else {
 		no_of_machines_start = int(math.Ceil(float64(clients) / float64(max_client_per_host)))
 	}
-	if no_of_machines_start >= 5 {
-		return "MORE THAN 5 NOT SUPPORTED AS OF NOW"
+	if no_of_machines_start >= e.cloud.GetMaxActionMachines() {
+		return fmt.Sprintf("MORE THAN %v NOT SUPPORTED AS OF NOW", e.cloud.GetMaxActionMachines())
 	}
 	capacity := clients
 	clients_per_host := max_client_per_host
-	usedActions := make(map[string]string)
+	usedActions := make(map[string]int)
 	for i := 0; i < no_of_machines_start; i++ {
 		if clients > max_client_per_host {
 			clients_per_host = max_client_per_host
@@ -64,7 +64,7 @@ func (e *etcdCoordinator) simLoad(session string, clients int, role string, cycl
 			}
 		}
 		if actionhost == nil {
-			usedActions["CLOUD_START"+strconv.Itoa(i)] = strconv.Itoa(clients_per_host)
+			usedActions["CLOUD_START"+strconv.Itoa(i)] = clients_per_host
 			go func() {
 				notifyip := e.startActionHost(-1)
 				log.Infof("waiting for action machine ip")
@@ -78,7 +78,7 @@ func (e *etcdCoordinator) simLoad(session string, clients int, role string, cycl
 			}()
 		} else {
 			log.Infof("action host found %v", actionhost.String())
-			usedActions[actionhost.Ip] = actionhost.Port
+			usedActions[actionhost.Ip] = clients_per_host
 			e.simLoadForHost(session, actionhost.Ip, actionhost.Port, clients_per_host, role, cycle, rooms, file, 1, capacity)
 		}
 	}

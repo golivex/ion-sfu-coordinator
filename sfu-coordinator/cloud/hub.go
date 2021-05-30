@@ -367,11 +367,18 @@ func (hub *Hub) UpdateNodeLoad(ip string, port string, peer int, cpu float64) {
 }
 
 func (h *Hub) CanAddMachine() bool {
-	em := len(h.machines) + len(h.lastMachineStarted)
+	sfu_machines := 0
+
+	for _, m := range h.machines {
+		if m.isSfu() {
+			sfu_machines = sfu_machines + 1
+		}
+	}
+	em := sfu_machines + len(h.lastMachineStarted)
 	if h.cloudOp {
 		em = em + 1
 	}
-	log.Infof("add machine calc len(machines) %v  len(lastMachineStarted) %v cloudOp %v final count %v MAX_CLOUD_HOSTS %v", len(h.machines), len(h.lastMachineStarted), h.cloudOp, em, MAX_CLOUD_HOSTS)
+	log.Infof("add machine calc len(machines) %v  len(lastMachineStarted) %v cloudOp %v final count %v MAX_CLOUD_HOSTS %v", sfu_machines, len(h.lastMachineStarted), h.cloudOp, em, MAX_CLOUD_HOSTS)
 
 	return em < MAX_CLOUD_HOSTS
 }

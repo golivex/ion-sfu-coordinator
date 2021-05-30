@@ -63,8 +63,15 @@ func GetInstanceCapablity(mtype string) int {
 func StartInstance(capacity int, zoneidx int, isaction bool) (machine, error) {
 	var m machine
 	ex := GetInstanceList()
-	if len(ex) >= MAX_CLOUD_HOSTS {
-		log.Infof("cannot start more hosts limit reached %v", MAX_CLOUD_HOSTS)
+
+	sfucount := 0
+	for _, m := range ex {
+		if m.isSfu() {
+			sfucount = sfucount + 1
+		}
+	}
+	if sfucount >= MAX_CLOUD_HOSTS {
+		log.Infof("cannot start more hosts limit reached %v sfu count %v", MAX_CLOUD_HOSTS, sfucount)
 		return m, errors.New("cannot start more hosts")
 	}
 

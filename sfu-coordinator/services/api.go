@@ -74,9 +74,7 @@ func (e *etcdCoordinator) InitApi() {
 		no := 1
 		if clients != "" {
 			x, err := strconv.Atoi(clients)
-			if err != nil {
-				log.Errorf("error string to int ", err)
-			} else {
+			if err == nil {
 				no = x
 			}
 		}
@@ -98,7 +96,7 @@ func (e *etcdCoordinator) InitApi() {
 		cycle := 0
 		if len(qcycle) != 0 {
 			x, err := strconv.Atoi(qcycle)
-			if err != nil {
+			if err == nil {
 				cycle = x
 			}
 		}
@@ -107,7 +105,7 @@ func (e *etcdCoordinator) InitApi() {
 		rooms := -1
 		if len(qrooms) != 0 {
 			x, err := strconv.Atoi(qrooms)
-			if err != nil {
+			if err == nil {
 				rooms = x
 			}
 		}
@@ -120,7 +118,7 @@ func (e *etcdCoordinator) InitApi() {
 		no := 1
 		if clients != "" {
 			x, err := strconv.Atoi(clients)
-			if err != nil {
+			if err == nil {
 				log.Errorf("error string to int ", err)
 			} else {
 				no = x
@@ -137,7 +135,7 @@ func (e *etcdCoordinator) InitApi() {
 		cycle := 0
 		if len(qcycle) != 0 {
 			x, err := strconv.Atoi(qcycle)
-			if err != nil {
+			if err == nil {
 				cycle = x
 			}
 		}
@@ -145,7 +143,7 @@ func (e *etcdCoordinator) InitApi() {
 		rooms := -1
 		if len(qrooms) != 0 {
 			x, err := strconv.Atoi(qrooms)
-			if err != nil {
+			if err == nil {
 				rooms = x
 			}
 		}
