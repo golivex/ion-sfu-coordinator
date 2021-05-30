@@ -35,19 +35,26 @@ func (e *etcdCoordinator) simLoad(session string, clients int, role string, cycl
 	// if i am doing sub only then load is 25% for 20sub, but current there is a default publisher also so 20 subs and 1pub
 
 	no_of_machines_start := 1
+	max_client_per_host = 20
 
 	if role == "sub" {
-		no_of_machines_start = int(math.Ceil(float64(clients) / 100))
-		clients = 100
+		max_client_per_host = 100
+		no_of_machines_start = int(math.Ceil(float64(clients) / max_client_per_host))
 	} else {
-		no_of_machines_start = int(math.Ceil(float64(clients) / 20))
-		clients = 20
+		no_of_machines_start = int(math.Ceil(float64(clients) / max_client_per_host))
 	}
 	if no_of_machines_start >= 5 {
 		return "MORE THAN 5 NOT SUPPORTED AS OF NOW"
 	}
+	clients_per_host := clients
 	usedActions := make(map[string]string)
 	for i := 0; i < no_of_machines_start; i++ {
+		if clients > max_client_per_host {
+			clients_per_host = max_client_per_host
+			clients = clients - max_client_per_host
+		} else {
+			clients_per_host = clients
+		}
 		actionhost := e.getReadyActionHost()
 		if actionhost != nil {
 			_, ok := usedActions[actionhost.Ip]
