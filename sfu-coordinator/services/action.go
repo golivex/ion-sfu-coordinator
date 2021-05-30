@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"net/http"
 	"strconv"
 	"sync"
@@ -30,32 +31,66 @@ func (e *etcdCoordinator) checkActionNode(host string, port string) bool {
 }
 
 func (e *etcdCoordinator) simLoad(session string, clients int, role string, cycle int, rooms int, file string) string {
-	actionhost := e.getReadyActionHost()
-	if actionhost == nil {
-		go func() {
-			notifyip := e.startActionHost(-1)
-			log.Infof("waiting for action machine ip")
-			ip := <-notifyip
-			log.Infof("got action machine ip %v", ip)
-			actionhost := e.getActionHostByIp(ip)
-			if actionhost == nil {
-				panic("host cannot be nil!")
-			}
-			e.simLoadForHost(session, actionhost.Ip, actionhost.Port, clients, role, cycle, rooms, file)
-		}()
-		return "NEW_CLOUD_HOST_STARTED"
+	// if i am doing 20 pubsub session load is 90% on n1 machine for load testing
+	// if i am doing sub only then load is 25% for 20sub, but current there is a default publisher also so 20 subs and 1pub
+
+	no_of_machines_start := 1
+
+	if role == "sub" {
+		no_of_machines_start = int(math.Ceil(float64(clients) / 100))
+		clients = 100
 	} else {
-		e.simLoadForHost(session, actionhost.Ip, actionhost.Port, clients, role, cycle, rooms, file)
-		return actionhost.String()
+		no_of_machines_start = int(math.Ceil(float64(clients) / 20))
+		clients = 20
 	}
+	if no_of_machines_start >= 5 {
+		return "MORE THAN 5 NOT SUPPORTED AS OF NOW"
+	}
+	usedActions := make(map[string]string)
+	for i := 0; i < no_of_machines_start; i++ {
+		actionhost := e.getReadyActionHost()
+		if actionhost != nil {
+			_, ok := usedActions[actionhost.Ip]
+			if ok {
+				actionhost = nil
+			}
+		}
+		if actionhost == nil {
+			usedActions["CLOUD_START"+strconv.Itoa(i)] = ""
+			go func() {
+				notifyip := e.startActionHost(-1)
+				log.Infof("waiting for action machine ip")
+				ip := <-notifyip
+				log.Infof("got action machine ip %v", ip)
+				actionhost := e.getActionHostByIp(ip)
+				if actionhost == nil {
+					panic("host cannot be nil!")
+				}
+				e.simLoadForHost(session, actionhost.Ip, actionhost.Port, clients, role, cycle, rooms, file, 5)
+			}()
+		} else {
+			log.Infof("action host found %v", actionhost.String())
+			usedActions[actionhost.Ip] = actionhost.Port
+			e.simLoadForHost(session, actionhost.Ip, actionhost.Port, clients, role, cycle, rooms, file, 1)
+		}
+	}
+	b, _ := json.Marshal(usedActions)
+	return string(b)
+
 }
 
-func (e *etcdCoordinator) simLoadForHost(session string, host string, port string, clients int, role string, cycle int, rooms int, file string) string {
+func (e *etcdCoordinator) simLoadForHost(session string, host string, port string, clients int, role string, cycle int, rooms int, file string, retry int) string {
+
 	apiurl := "http://" + host + ":" + port + "/load/" + session + "?clients=" + strconv.Itoa(clients) + "&role=" + role + "&cycle=" + strconv.Itoa(cycle) + "&rooms=" + strconv.Itoa(rooms) + "&file=" + file
-	log.Infof("api called %v", apiurl)
+	log.Infof("api called %v retry %v", apiurl, retry)
 	resp, err := http.Get(apiurl)
 	if err != nil {
 		log.Errorf("%v", err)
+		if retry > 1 {
+			time.Sleep(5) //it takes time for host to get ready
+			return e.simLoadForHost(session, host, port, clients, role, cycle, rooms, file, retry-1)
+
+		}
 		return fmt.Sprintf("Err %v", err)
 	}
 	log.Infof("SimLoad sfu %v", resp.StatusCode)

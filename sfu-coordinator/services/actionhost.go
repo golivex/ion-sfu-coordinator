@@ -23,8 +23,10 @@ func (e *etcdCoordinator) getReadyActionHost() *Host {
 func (e *etcdCoordinator) getActionHostByIp(ip string) *Host {
 	var h *Host
 	for _, host := range e.actionhosts {
+		log.Infof("host ip %v ip %v host debug", host.Ip, ip, host.String())
 		if host.Ip == ip {
 			h = &host
+			break
 		}
 	}
 	return h

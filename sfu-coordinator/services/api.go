@@ -81,7 +81,7 @@ func (e *etcdCoordinator) InitApi() {
 			}
 		}
 		role := c.Query("role")
-		if len(role) == 0 {
+		if len(role) == 0 || role == "pubsub" {
 			role = "pubsub"
 		} else {
 			role = "sub"
@@ -113,9 +113,7 @@ func (e *etcdCoordinator) InitApi() {
 		}
 
 		resp := e.simLoad(c.Param("session"), no, role, cycle, rooms, file)
-		c.JSON(http.StatusOK, gin.H{
-			"Response": resp,
-		})
+		c.String(http.StatusOK, resp)
 	})
 	r.GET("/load/:session/:host/:port", func(c *gin.Context) {
 		clients := c.Query("clients")
@@ -129,7 +127,7 @@ func (e *etcdCoordinator) InitApi() {
 			}
 		}
 		role := c.Query("role")
-		if len(role) == 0 {
+		if len(role) == 0 || role == "pubsub" {
 			role = "pubsub"
 		} else {
 			role = "sub"
@@ -159,7 +157,7 @@ func (e *etcdCoordinator) InitApi() {
 			file = c.Query("file")
 		}
 
-		go e.simLoadForHost(c.Param("session"), c.Param("host"), c.Param("port"), no, role, cycle, rooms, file)
+		go e.simLoadForHost(c.Param("session"), c.Param("host"), c.Param("port"), no, role, cycle, rooms, file, 1)
 		c.Status(http.StatusOK)
 	})
 	// /session/test/node/5.9.18.28:7002/peer/ckoy35usg00080110qpo13b3v

@@ -6,6 +6,9 @@ import (
 	log "github.com/pion/ion-log"
 )
 
+const IDLE_TIMEOUT_ACTIONS_CLOUD_HOST = 60 * 2
+const MAX_CLOUD_ACTION_MACHINES = 5
+
 type actionnode struct {
 	Ip                string
 	Port              string
@@ -55,7 +58,7 @@ func (h *Hub) checkIdleActionNodes() {
 	for idx, n := range h.actionnodes {
 		if n.isIdle {
 
-			if time.Since(n.lastIdleCheckTime) > (IDLE_TIMEOUT_CLOUD_HOST * time.Second) {
+			if time.Since(n.lastIdleCheckTime) > (IDLE_TIMEOUT_ACTIONS_CLOUD_HOST * time.Second) {
 
 				//check if all nodes are idle for this specific ip
 				// as we can have multiple nodes on a single ip
@@ -63,20 +66,18 @@ func (h *Hub) checkIdleActionNodes() {
 				if all_idle {
 					//check if its a cloud instance
 					if n.isCloud(h) {
-						log.Infof("node is idle after %v sec delete it as its cloud instance", IDLE_TIMEOUT_CLOUD_HOST)
+						log.Infof("node is idle after %v sec delete it as its cloud instance", IDLE_TIMEOUT_ACTIONS_CLOUD_HOST)
 						m := n.getCloudMachine(h)
 						if m != nil {
-							if len(h.machines) > MINIMUM_CLOUD_HOSTS {
-								log.Infof("deleting host %v", m.getIP())
-								go DeleteInstance(*m)
-								//TODO need to see how we can delete avaiable host here instance maybe even use etcd?
-								delete(h.machines, m.Id)
-							} else {
-								log.Infof("cannot delete cloud instance as minimum of %v instances required", MINIMUM_CLOUD_HOSTS)
-							}
+
+							log.Infof("deleting actinos host %v", m.getIP())
+							go DeleteInstance(*m)
+							//TODO need to see how we can delete avaiable host here instance maybe even use etcd?
+							delete(h.machines, m.Id)
+
 						}
 					} else {
-						log.Infof("node is idle after %v sec but its not a cloud instance", IDLE_TIMEOUT_CLOUD_HOST)
+						log.Infof("node is idle after %v sec but its not a cloud instance", IDLE_TIMEOUT_ACTIONS_CLOUD_HOST)
 					}
 
 				} else {
@@ -117,6 +118,21 @@ func (h *Hub) checkDeadActionNodes() {
 }
 
 func (h *Hub) StartActionServerNotify(capacity int, notify chan<- string) bool {
+
+	amcount := 0
+	for _, m := range h.machines {
+		if m.isAction() {
+			amcount = amcount + 1
+		}
+	}
+
+	log.Infof("action machines already started %v and count of machines in process %v", amcount, len(h.lastMachineStarted))
+	amcount = amcount + len(h.lastMachineStarted)
+
+	if amcount > MAX_CLOUD_ACTION_MACHINES {
+		log.Infof("cannot start more than %v action machines", MAX_CLOUD_ACTION_MACHINES)
+		return false
+	}
 
 	m, err := StartInstance(capacity, -1, true)
 	if err != nil {
