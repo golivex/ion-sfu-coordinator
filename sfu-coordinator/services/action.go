@@ -1,7 +1,9 @@
 package coordinator
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"strconv"
 	"sync"
@@ -88,6 +90,61 @@ func (e *etcdCoordinator) stopSimLoad(host string, port string) string {
 		return "HOST_PORT_NOT_FOUND"
 	}
 
+}
+
+type LoadStatResponse struct {
+	Clients     int `json:"clients"`
+	TotalRecvBW int `json:"totalRecvBW"`
+	TotalSendBW int `json:"totalSendBW"`
+	Engine      int `json:"engine"`
+}
+
+type StatResponse struct {
+	Ip    string
+	Port  string
+	Error string
+	Stats LoadStatResponse
+}
+
+func (e *etcdCoordinator) statsLoadAll() []StatResponse {
+
+	var stats []StatResponse
+	for _, h := range e.actionhosts {
+
+		hstats := e.statsLoad(h.Ip, h.Port)
+		stats = append(stats, hstats)
+	}
+	log.Infof("load stats %v", stats)
+	return stats
+}
+
+func (e *etcdCoordinator) statsLoad(ip string, port string) StatResponse {
+	hstats := StatResponse{
+		Ip:   ip,
+		Port: port,
+	}
+
+	client := http.Client{
+		Timeout: 5 * time.Second,
+	}
+	resp, err := client.Get("http://" + ip + ":" + port + "/load/stats")
+	if err != nil {
+		hstats.Error = fmt.Sprintf("err %v", err)
+	} else {
+		body, err2 := ioutil.ReadAll(resp.Body)
+		if err2 != nil {
+			log.Errorf("%v", err)
+			hstats.Error = fmt.Sprintf("err %v", err)
+		} else {
+			var response LoadStatResponse
+			err = json.Unmarshal(body, &response)
+			if err != nil {
+				log.Errorf("error parsing host response", err)
+			}
+			hstats.Stats = response
+		}
+	}
+	return hstats
 }
 
 const MIRROR_RETRY_WAIT = 15

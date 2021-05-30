@@ -45,6 +45,18 @@ func (e *etcdCoordinator) InitApi() {
 		host := e.FindHost(id, cap, role)
 		c.JSON(200, host)
 	})
+	r.GET("/load/stats", func(c *gin.Context) {
+		hosts := e.statsLoadAll()
+		c.JSON(http.StatusOK, gin.H{
+			"Response": hosts,
+		})
+	})
+	r.GET("/load/stats/:host/:port", func(c *gin.Context) {
+		hosts := e.statsLoad(c.Param("host"), c.Param("port"))
+		c.JSON(http.StatusOK, gin.H{
+			"Response": hosts,
+		})
+	})
 	r.GET("/stopload", func(c *gin.Context) {
 		hosts := e.stopAllSimLoad()
 		c.JSON(http.StatusOK, gin.H{
