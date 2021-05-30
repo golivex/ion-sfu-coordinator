@@ -65,14 +65,22 @@ func StartInstance(capacity int, zoneidx int, isaction bool) (machine, error) {
 	ex := GetInstanceList()
 
 	sfucount := 0
+	actioncount := 0
 	for _, m := range ex {
 		if m.isSfu() {
 			sfucount = sfucount + 1
 		}
+		if m.isAction() {
+			actioncount = actioncount + 1
+		}
 	}
-	if sfucount >= MAX_CLOUD_HOSTS {
-		log.Infof("cannot start more hosts limit reached %v sfu count %v", MAX_CLOUD_HOSTS, sfucount)
-		return m, errors.New("cannot start more hosts")
+	if sfucount >= MAX_CLOUD_HOSTS && !isaction {
+		log.Infof("cannot start more sfu hosts limit reached %v sfu count %v", MAX_CLOUD_HOSTS, sfucount)
+		return m, errors.New("cannot start more sfu hosts")
+	}
+	if actioncount >= MAX_CLOUD_ACTION_MACHINES && isaction {
+		log.Infof("cannot start more action hosts limit reached %v sfu count %v", MAX_CLOUD_ACTION_MACHINES, actioncount)
+		return m, errors.New("cannot start more action hosts")
 	}
 
 	name := cuid.New()
@@ -91,7 +99,7 @@ func StartInstance(capacity int, zoneidx int, isaction bool) (machine, error) {
 	if capacity == -1 {
 		machine_type = DEFAULT_MACHINE_TYPE
 	} else {
-		if capacity > 20 && capacity < 50 {
+		if capacity >= 20 && capacity < 50 {
 			machine_type = DEFAULT_MACHINE_SERIES + "-highcpu-2"
 		} else if capacity >= 50 && capacity < 100 {
 			machine_type = DEFAULT_MACHINE_SERIES + "-highcpu-4"
@@ -103,7 +111,7 @@ func StartInstance(capacity int, zoneidx int, isaction bool) (machine, error) {
 			machine_type = DEFAULT_MACHINE_TYPE
 		}
 	}
-	log.Infof("starting server with capacity %v for machine_type %v", capacity, machine_type)
+	log.Infof("starting server with capacity %v for machine_type %v is sfu %v", capacity, machine_type, !isaction)
 	if isaction {
 		name = "action-" + name
 	} else {

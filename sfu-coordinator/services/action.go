@@ -40,13 +40,14 @@ func (e *etcdCoordinator) simLoad(session string, clients int, role string, cycl
 	if role == "sub" {
 		max_client_per_host = 200
 		no_of_machines_start = int(math.Ceil(float64(clients) / float64(max_client_per_host)))
+		capacity := clients / 10 //start
 	} else {
 		no_of_machines_start = int(math.Ceil(float64(clients) / float64(max_client_per_host)))
+		capacity := clients //start server with capacity for all nodes
 	}
 	if no_of_machines_start >= e.cloud.GetMaxActionMachines() {
 		return fmt.Sprintf("MORE THAN %v NOT SUPPORTED AS OF NOW", e.cloud.GetMaxActionMachines())
 	}
-	capacity := clients
 	clients_per_host := max_client_per_host
 	usedActions := make(map[string]int)
 	for i := 0; i < no_of_machines_start; i++ {
