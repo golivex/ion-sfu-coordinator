@@ -171,7 +171,7 @@ func (h *Hub) syncCloudMachines() {
 			log.Infof("machine deleted %v", m.getIP())
 			delete(h.machines, id)
 		} else {
-			log.Infof("machine already exists %v", m.getIP())
+			// log.Infof("machine already exists %v", m.getIP())
 		}
 
 	}

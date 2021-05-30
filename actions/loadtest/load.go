@@ -80,7 +80,7 @@ func InitLoadTestApi(serverIp string, session string, clients int, role string, 
 		}
 	}
 	log.Infof("filepath %v", filepath)
-	return Init(filepath, "http://"+serverIp+":4000/", session, clients, cycle, 60*60, role, true, true, "", "", rooms, cancel)
+	return Init(filepath, serverIp, session, clients, cycle, 60*60, role, true, true, "", "", rooms, cancel)
 }
 
 func Init(file, gaddr, session string, total, cycle, duration int, role string, video bool, audio bool, simulcast string, paddr string, create_room int, cancel chan struct{}) *sdk.Engine {
