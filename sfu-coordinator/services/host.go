@@ -183,6 +183,9 @@ func (e *etcdCoordinator) deleteHost(h *Host, isaction bool) {
 }
 func (e *etcdCoordinator) deleteHostString(ip string, isaction bool) {
 	ip = strings.Replace(ip, "available-hosts/", "", -1)
+	if isaction {
+		ip = strings.Replace(ip, "action-hosts/", "", -1)
+	}
 	port := ""
 	if strings.Contains(ip, ":") {
 		port = strings.Split(ip, ":")[1]
