@@ -79,10 +79,11 @@ func (h *Host) GetCurrentLoad() float64 {
 }
 
 type HostPing struct {
-	Ip   string  `json:"ip"`
-	Port string  `json:"port"`
-	Cpu  float64 `json:"cpu"`
-	Mem  float64 `json:"mem"`
+	Ip    string  `json:"ip"`
+	Port  string  `json:"port"`
+	Cpu   float64 `json:"cpu"`
+	Mem   float64 `json:"mem"`
+	Tasks int     `json:"tasks"`
 }
 
 func (e *etcdCoordinator) addHost(key string, loadStr []byte, isaction bool) {
@@ -117,6 +118,7 @@ func (e *etcdCoordinator) addHost(key string, loadStr []byte, isaction bool) {
 		host := Host{
 			Ip:              hostping.Ip,
 			Port:            hostping.Port,
+			Tasks:           hostping.Tasks,
 			Loads:           []Load{},
 			Spike:           []Spike{},
 			BlockedCapacity: make(map[string]capacity),
@@ -135,6 +137,7 @@ func (e *etcdCoordinator) addHost(key string, loadStr []byte, isaction bool) {
 		} else {
 			host = e.hosts[key]
 		}
+		host.Tasks = hostping.Tasks
 		host.Loads = append(host.Loads, l)
 		host.lastPing = time.Now()
 		len := len(host.Loads)
@@ -247,33 +250,6 @@ func (e *etcdCoordinator) WatchHosts(ctx context.Context) {
 				ip := string(ev.Kv.Key[:])
 				e.deleteHostString(ip, false)
 
-			}
-			// log.Infof(" watch host %s %q : %q\n", ev.Type, ev.Kv.Key, ev.Kv.Value)
-			// log.Infof("hosts %v", e.hosts)
-		}
-	}
-}
-
-func (e *etcdCoordinator) WatchActionHosts(ctx context.Context) {
-	log.Infof("watching action hosts")
-	rch := e.cli.Watch(ctx, "action-hosts/", clientv3.WithPrefix())
-	for wresp := range rch {
-		for _, ev := range wresp.Events {
-			if ev.Type == mvccpb.PUT {
-				ip := string(ev.Kv.Key[:])
-				loadStr := ev.Kv.Value[:]
-				e.addHost(ip, loadStr, true)
-			}
-			if ev.Type == mvccpb.DELETE {
-				ip := string(ev.Kv.Key[:])
-				e.deleteHostString(ip, true)
-
-			}
-			if e.cloud != nil {
-				for _, host := range e.actionhosts {
-					cpu := host.GetCurrentLoad()
-					e.cloud.UpdateActionNodeLoad(host.Ip, host.Port, host.Tasks, cpu)
-				}
 			}
 			// log.Infof(" watch host %s %q : %q\n", ev.Type, ev.Kv.Key, ev.Kv.Value)
 			// log.Infof("hosts %v", e.hosts)

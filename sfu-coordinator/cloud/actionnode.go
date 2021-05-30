@@ -40,7 +40,7 @@ func (n *actionnode) checkAllNodeIdle(h *Hub) bool {
 
 func (n *actionnode) getCloudMachine(h *Hub) *machine {
 	for _, m := range h.machines {
-		log.Infof("checking for cloud machine from node m.getIp %v n.Ip%v", m.getIP(), n.Ip)
+		log.Infof("checking for cloud machine from node m.getIp %v node.Ip%v", m.getIP(), n.Ip)
 		if m.getIP() == n.Ip {
 			return &m
 		}
@@ -87,7 +87,7 @@ func (h *Hub) checkIdleActionNodes() {
 		}
 
 		if n.Tasks == 0 {
-			log.Infof("action node is idle %v %v", n.Ip, n.Port)
+			log.Infof("action node is idle %v %v tasks %v", n.Ip, n.Port, n.Tasks)
 			if !n.isIdle {
 				n.lastIdleCheckTime = time.Now()
 			}
