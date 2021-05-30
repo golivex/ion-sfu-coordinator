@@ -22,7 +22,7 @@ func main() {
 
 	flag.StringVar(&eaddr, "eaddr", "0.0.0.0:2379", "etcd ip")
 	flag.StringVar(&ipaddr, "ipaddr", "5.9.18.28", "current server ip")
-	flag.StringVar(&saddr, "saddr", "5.9.18.28", "server cluster ip")
+	flag.StringVar(&saddr, "saddr", "http://5.9.18.28:4000/", "server cluster ip")
 	flag.StringVar(&port, "port", ":3050", "API Port")
 	flag.Parse()
 

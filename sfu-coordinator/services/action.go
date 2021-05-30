@@ -92,23 +92,31 @@ func (e *etcdCoordinator) stopSimLoad(host string, port string) string {
 
 }
 
-type LoadStatResponse struct {
-	Clients     int `json:"clients"`
-	TotalRecvBW int `json:"totalRecvBW"`
-	TotalSendBW int `json:"totalSendBW"`
-	Engine      int `json:"engine"`
+type loadResponse struct {
+	Cpu   float64 `json:"cpu"`
+	Tasks int     `json:"tasks"`
+	Ip    string  `json:"ip"`
+	Port  string  `json:"port"`
 }
 
-type StatResponse struct {
+type loadStatResponse struct {
+	Clients     int          `json:"clients"`
+	TotalRecvBW int          `json:"totalRecvBW"`
+	TotalSendBW int          `json:"totalSendBW"`
+	Engine      int          `json:"engine"`
+	Hostload    loadResponse `json:"hostload"`
+}
+
+type statResponse struct {
 	Ip    string
 	Port  string
 	Error string
-	Stats LoadStatResponse
+	Stats loadStatResponse
 }
 
-func (e *etcdCoordinator) statsLoadAll() []StatResponse {
+func (e *etcdCoordinator) statsLoadAll() []statResponse {
 
-	var stats []StatResponse
+	var stats []statResponse
 	for _, h := range e.actionhosts {
 
 		hstats := e.statsLoad(h.Ip, h.Port)
@@ -118,8 +126,8 @@ func (e *etcdCoordinator) statsLoadAll() []StatResponse {
 	return stats
 }
 
-func (e *etcdCoordinator) statsLoad(ip string, port string) StatResponse {
-	hstats := StatResponse{
+func (e *etcdCoordinator) statsLoad(ip string, port string) statResponse {
+	hstats := statResponse{
 		Ip:   ip,
 		Port: port,
 	}
@@ -136,7 +144,7 @@ func (e *etcdCoordinator) statsLoad(ip string, port string) StatResponse {
 			log.Errorf("%v", err)
 			hstats.Error = fmt.Sprintf("err %v", err)
 		} else {
-			var response LoadStatResponse
+			var response loadStatResponse
 			err = json.Unmarshal(body, &response)
 			if err != nil {
 				log.Errorf("error parsing host response", err)
