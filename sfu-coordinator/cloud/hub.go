@@ -187,7 +187,15 @@ func (h *Hub) checkDeadMachines() {
 		for _, n := range h.nodes {
 			if n.Ip == m.getIP() {
 				found = true
-				log.Infof("ip found machine is not dead %v", m.getIP())
+				log.Infof("ip found machine as a sfu node is not dead %v", m.getIP())
+				break
+			}
+		}
+
+		for _, n := range h.actionnodes {
+			if n.Ip == m.getIP() {
+				found = true
+				log.Infof("ip found machine as a action node is not dead %v", m.getIP())
 				break
 			}
 		}

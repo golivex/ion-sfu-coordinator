@@ -16,7 +16,10 @@ var checkmu sync.Mutex
 func (e *etcdCoordinator) checkActionNode(host string, port string) bool {
 	apiurl := "http://" + host + ":" + port
 	log.Infof("api called %v", apiurl)
-	_, err := http.Get(apiurl)
+	client := http.Client{
+		Timeout: 5 * time.Second,
+	}
+	_, err := client.Get(apiurl)
 	if err != nil {
 		log.Errorf("%v", err)
 		return false

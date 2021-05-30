@@ -102,22 +102,26 @@ func StartInstance(capacity int, zoneidx int, isaction bool) (machine, error) {
 	} else {
 		name = "sfu-" + name
 	}
-	startupscript := "startup-script=./cloud/scripts/imagestartup.sh"
+	startupscript := "startup-script=./cloud/scripts/sfu-image-startup.sh"
+	imagename := "sfu-minimal-image"
+	tag := "sfu"
 	if isaction {
-		startupscript = "startup-script=./cloud/scripts/actionstartup.sh"
+		startupscript = "startup-script=./cloud/scripts/actions-image-startup.sh"
+		tag = "action"
+		imagename = "actions-minimal-image"
 	}
 	output, err := exec.Command(
 		"gcloud", "beta", "compute", "instances", "create", name,
 		"--zone="+zone,
 		"--machine-type="+machine_type,
-		"--tags=sfu",
-		"--image=sfu-minimal-image",
+		"--tags="+tag,
+		"--image="+imagename,
 		// "--image-family=ubuntu-minimal-2010",
 		// "--image-project=ubuntu-os-cloud",
 		"--maintenance-policy=TERMINATE",
 		"--boot-disk-type=pd-ssd",
 		"--metadata-from-file", startupscript,
-		// "--metadata-from-file", "startup-script=./cloud/scripts/startup.sh",
+		// "--metadata-from-file", "startup-script=./cloud/scripts/sfu-base-startup.sh",
 		"--create-disk", "size=100GB,type=pd-ssd,auto-delete=yes", "--format=json").Output() //--scopes=logging-write,compute-rw,cloud-platform
 
 	// var stdout bytes.Buffer
