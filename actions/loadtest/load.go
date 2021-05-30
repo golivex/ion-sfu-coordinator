@@ -42,7 +42,7 @@ func InitLoadTestApi(serverIp string, session string, clients int, role string, 
 		clients = 1
 	}
 	filepath := "test"
-	if file == "default" {
+	if file == "360p" {
 		filepath = "/var/tmp/Big_Buck_Bunny_4K.webm.360p.webm"
 		if _, err := os.Stat(filepath); os.IsNotExist(err) {
 			// filepath = "./video/big-buck-bunny_trailer.webm"

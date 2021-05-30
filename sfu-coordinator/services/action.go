@@ -35,10 +35,10 @@ func (e *etcdCoordinator) simLoad(session string, clients int, role string, cycl
 	// if i am doing sub only then load is 25% for 20sub, but current there is a default publisher also so 20 subs and 1pub
 
 	no_of_machines_start := 1
-	max_client_per_host := 20
+	max_client_per_host := 40 //start 2 vcpu by default
 
 	if role == "sub" {
-		max_client_per_host = 100
+		max_client_per_host = 200
 		no_of_machines_start = int(math.Ceil(float64(clients) / float64(max_client_per_host)))
 	} else {
 		no_of_machines_start = int(math.Ceil(float64(clients) / float64(max_client_per_host)))
@@ -66,7 +66,7 @@ func (e *etcdCoordinator) simLoad(session string, clients int, role string, cycl
 		if actionhost == nil {
 			usedActions["CLOUD_START"+strconv.Itoa(i)] = clients_per_host
 			go func() {
-				notifyip := e.startActionHost(-1)
+				notifyip := e.startActionHost(20) //start 2vcpu machine
 				log.Infof("waiting for action machine ip")
 				ip := <-notifyip
 				log.Infof("got action machine ip %v", ip)
