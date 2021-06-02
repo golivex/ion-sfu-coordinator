@@ -24,7 +24,6 @@ const actions = {
 
         try {
             const res = await Load.startLoadTest(file, clients, role, cycle, rooms);
-            console.log('%c --res[startLoadTest]', 'color: #bfffc8', res);
             const { status, data } = res
             if (status >= 200 && status < 400) {
                 localStorage.setItem('loadTest', data)
@@ -40,7 +39,6 @@ const actions = {
     async stopLoadTest({ commit }) {
         try {
             const res = await Load.stopLoadTest();
-            console.log('%c --res[stopLoadTest]', 'color: #1d3f73', res);
             const { status } = res
             if (status >= 200 && status < 400) {
                 localStorage.removeItem('loadTest')
@@ -57,7 +55,6 @@ const actions = {
     async fetchLoadStats({ commit }) {
         try {
             const res = await Load.loadStats();
-            console.log('%c --res[fetchLoadStats]', 'color: #735656', res);
             const { Response } = res.data || []
             commit('SET_LOAD_STATUS', Response)
         } catch (error) {
