@@ -45,11 +45,6 @@ func InitLoadTestApi(serverIp string, session string, clients int, role string, 
 	if file == "360p" {
 		filepath = "/var/tmp/Big_Buck_Bunny_4K.webm.360p.webm"
 		if _, err := os.Stat(filepath); os.IsNotExist(err) {
-			// filepath = "./video/big-buck-bunny_trailer.webm"
-			// if _, err := os.Stat(filepath); os.IsNotExist(err) {
-			// 	log.Infof("file doesn't exist switch to default")
-			// 	filepath = "test"
-			// }
 			err := DownloadFile(filepath, "https://upload.wikimedia.org/wikipedia/commons/transcoded/c/c0/Big_Buck_Bunny_4K.webm/Big_Buck_Bunny_4K.webm.360p.webm")
 			if err != nil {
 				log.Infof("error downloading file %v", err)
@@ -139,7 +134,6 @@ func run(e *sdk.Engine, addr, session, file, role string, total, duration, cycle
 				new_session = new_session + fmt.Sprintf("%v", i%create_room)
 			}
 			notify := make(chan string, 1)
-
 			go connection.GetHost(addr, new_session, notify, cancel, role, capacity)
 			sfu_host := <-notify
 

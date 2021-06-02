@@ -25,8 +25,8 @@ services:
         container_name: actions
         build:
             context : actions
-        command: ["-port", ":3050", "-ipaddr" , "5.9.18.28" , "-eaddr", "5.9.18.28:2379", "-saddr","http://5.9.18.28:4000/"]
-        restart: always
+        command: ["-port", ":3050", "-ipaddr" , "5.9.18.28" , "-saddr","http://5.9.18.28:4000/"] # "-eaddr", "5.9.18.28:2379",
+        # restart: always // stop actions from working
         network_mode: host
 
     

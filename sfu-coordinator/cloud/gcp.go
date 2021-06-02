@@ -12,8 +12,8 @@ import (
 	log "github.com/pion/ion-log"
 )
 
-const DEFAULT_MACHINE_TYPE = "n1-standard-1"
-const DEFAULT_MACHINE_SERIES = "n1"
+const DEFAULT_MACHINE_SERIES = "n2"
+const DEFAULT_MACHINE_TYPE = DEFAULT_MACHINE_SERIES + "-standard-1"
 
 func getZone() []string {
 	return []string{"asia-south1-a", "asia-south1-b", "asia-south1-c", "asia-east1-a", "asia-east1-b", "asia-east1-c", "us-central1-a", "us-central1-b"}
@@ -95,18 +95,20 @@ func StartInstance(capacity int, zoneidx int, isaction bool) (machine, error) {
 	} else {
 		return m, errors.New("all zones completed")
 	}
-	machine_type := "n1-standard-1"
+	machine_type := DEFAULT_MACHINE_SERIES + "-standard-1"
 	if capacity == -1 {
 		machine_type = DEFAULT_MACHINE_TYPE
 	} else {
-		if capacity >= 20 && capacity < 50 {
+		if capacity >= 20 && capacity < 40 {
 			machine_type = DEFAULT_MACHINE_SERIES + "-highcpu-2"
-		} else if capacity >= 50 && capacity < 100 {
+		} else if capacity >= 40 && capacity < 80 {
 			machine_type = DEFAULT_MACHINE_SERIES + "-highcpu-4"
-		} else if capacity >= 100 && capacity < 300 {
+		} else if capacity >= 80 && capacity < 200 {
 			machine_type = DEFAULT_MACHINE_SERIES + "-highcpu-8"
-		} else if capacity >= 300 {
+		} else if capacity >= 200 && capacity < 300 {
 			machine_type = DEFAULT_MACHINE_SERIES + "-highcpu-16"
+		} else if capacity >= 300 && capacity < 500 {
+			machine_type = DEFAULT_MACHINE_SERIES + "-highcpu-32"
 		} else {
 			machine_type = DEFAULT_MACHINE_TYPE
 		}
@@ -126,7 +128,7 @@ func StartInstance(capacity int, zoneidx int, isaction bool) (machine, error) {
 		imagename = "actions-minimal-image"
 	}
 	output, err := exec.Command(
-		"gcloud", "beta", "compute", "instances", "create", name,
+		"gcloud", "compute", "instances", "create", name,
 		"--zone="+zone,
 		"--machine-type="+machine_type,
 		"--tags="+tag,
@@ -148,7 +150,7 @@ func StartInstance(capacity int, zoneidx int, isaction bool) (machine, error) {
 	// output := []byte("")
 
 	if err != nil {
-		log.Errorf("StartServer", err)
+		log.Errorf("StartServer %v", err)
 		return StartInstance(capacity, zoneidx+1, isaction)
 	}
 	// log.Debugf("output %v", string(output))
@@ -159,9 +161,22 @@ func StartInstance(capacity int, zoneidx int, isaction bool) (machine, error) {
 }
 
 func GetInstanceList() []machine {
-	output, err := exec.Command("gcloud", "beta", "compute", "instances", "list", "--format=json").Output()
+
+	// cmd := exec.Command("gcloud", "compute", "instances", "list", "--format=json")
+
+	// var stdout bytes.Buffer
+	// var stderr bytes.Buffer
+	// cmd.Stdout = &stdout
+	// cmd.Stderr = &stderr
+	// err := cmd.Run()
+	// if err != nil {
+	// 	log.Errorf("getInstanceList %v", err)
+	// }
+	// log.Infof("stdout.String(), stderr.String()", stdout.String(), stderr.String())
+
+	output, err := exec.Command("gcloud", "compute", "instances", "list", "--format=json").Output()
 	if err != nil {
-		log.Errorf("getInstanceList", err)
+		log.Errorf("getInstanceList %v", err)
 	}
 	// var instances []map[string]interface{}
 	// json.Unmarshal(output, &instances)
@@ -197,10 +212,10 @@ func DeleteInstance(m machine) error {
 	if len(m.getName()) == 0 {
 		return errors.New("Machine name cannot be empty!")
 	}
-	_, err := exec.Command("gcloud", "beta", "compute", "instances", "delete", m.getName(), "--zone="+m.GetZone(), "--quiet", "--format=json").Output()
+	_, err := exec.Command("gcloud", "compute", "instances", "delete", m.getName(), "--zone="+m.GetZone(), "--quiet", "--format=json").Output()
 
 	if err != nil {
-		log.Errorf("DeleteServer", err)
+		log.Errorf("DeleteServer %v", err)
 		return err
 	}
 	return nil

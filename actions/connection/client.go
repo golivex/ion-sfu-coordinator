@@ -19,7 +19,7 @@ type HostResponse struct {
 	Publish bool //not using this as of now as purpose of load test will fail
 }
 
-func GetHost(addr string, new_session string, notify chan string, cancel chan struct{}, role string, capacity int) {
+func GetHost(addr string, new_session string, notify chan string, cancel <-chan struct{}, role string, capacity int) {
 
 	// notify <- "0.0.0.0:50052"
 

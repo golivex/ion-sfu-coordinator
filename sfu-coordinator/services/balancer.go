@@ -18,7 +18,7 @@ const CAN_HOST_MIRROR = false
 const MAX_TRACKS_PER_HOST = 9999      //if more than X tracks cannot connect to host at all
 const MAX_PUBLISH_TRACK_THRESH = 9999 //if more than X tracks cannot publish anymore, can only subscribe
 
-const MAX_CPULOAD_PER_HOST = 85       // if more than X cpu load, cannot connect to the host at all until load goes down, also load goes down over a period of time
+const MAX_CPULOAD_PER_HOST = 80       // if more than X cpu load, cannot connect to the host at all until load goes down, also load goes down over a period of time
 const MAX_PUBLISH_CPULOAD_THRESH = 70 // if more than X cpu, cannot publish can only subscribe
 
 type HostReply struct {
@@ -56,6 +56,9 @@ func (e *etcdCoordinator) FindHost(session string, capacity int, role string) Ho
 		capacity = DEFAULT_CAPACITY
 	} else {
 		log.Infof("got capacity %v", capacity)
+	}
+	if role == "sub" {
+		capacity = capacity / 10
 	}
 
 	if len(e.hosts) == 0 {

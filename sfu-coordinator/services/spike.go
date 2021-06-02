@@ -36,7 +36,7 @@ func (e *etcdCoordinator) SpikeHost(h *Host, role string) {
 	}
 
 	if role == "sub" {
-		cpu = 1
+		cpu = cpu + 1
 		skipe = Spike{
 			Peer:   1,
 			Tracks: 1,

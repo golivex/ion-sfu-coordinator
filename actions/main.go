@@ -4,7 +4,7 @@ import (
 	"flag"
 	"os"
 
-	actions "github.com/manishiitg/actions/pkg"
+	actions "github.com/manishiitg/actions/lib"
 	log "github.com/pion/ion-log"
 )
 

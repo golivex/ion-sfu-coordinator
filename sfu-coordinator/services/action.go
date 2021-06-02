@@ -40,15 +40,14 @@ func (e *etcdCoordinator) simLoad(session string, clients int, role string, cycl
 	if role == "sub" {
 		max_client_per_host = 200
 		no_of_machines_start = int(math.Ceil(float64(clients) / float64(max_client_per_host)))
-		capacity := clients / 10 //start
 	} else {
 		no_of_machines_start = int(math.Ceil(float64(clients) / float64(max_client_per_host)))
-		capacity := clients //start server with capacity for all nodes
 	}
+	capacity := clients //start server with capacity for all nodes based on role balance will automatically start the proper instance
 	if no_of_machines_start >= e.cloud.GetMaxActionMachines() {
 		return fmt.Sprintf("MORE THAN %v NOT SUPPORTED AS OF NOW", e.cloud.GetMaxActionMachines())
 	}
-	clients_per_host := max_client_per_host
+	clients_per_host := int(math.Ceil(float64(clients) / float64(max_client_per_host)))
 	usedActions := make(map[string]int)
 	for i := 0; i < no_of_machines_start; i++ {
 		if clients > max_client_per_host {
@@ -90,7 +89,7 @@ func (e *etcdCoordinator) simLoad(session string, clients int, role string, cycl
 
 func (e *etcdCoordinator) simLoadForHost(session string, host string, port string, clients int, role string, cycle int, rooms int, file string, retry int, capacity int) string {
 
-	apiurl := "http://" + host + ":" + port + "/load/" + session + "?clients=" + strconv.Itoa(clients) + "&role=" + role + "&cycle=" + strconv.Itoa(cycle) + "&rooms=" + strconv.Itoa(rooms) + "&file=" + file + "&capacity=" + strconv.Itoa(capacity)
+	apiurl := "http://" + host + ":" + port + "/loadtest/" + session + "?clients=" + strconv.Itoa(clients) + "&role=" + role + "&cycle=" + strconv.Itoa(cycle) + "&rooms=" + strconv.Itoa(rooms) + "&file=" + file + "&capacity=" + strconv.Itoa(capacity)
 	log.Infof("api called %v retry %v", apiurl, retry)
 	resp, err := http.Get(apiurl)
 	if err != nil {
@@ -123,12 +122,12 @@ func (e *etcdCoordinator) stopSimLoad(host string, port string) string {
 		}
 	}
 	if found {
-		resp, err := http.Get("http://" + host + ":" + port + "/stopload")
+		resp, err := http.Get("http://" + host + ":" + port + "/loadtest/stop")
 		if err != nil {
 			log.Errorf("err %v", err)
 			return fmt.Sprintf("Err %v", err)
 		}
-		log.Infof("SimLoad sfu %v", resp.StatusCode)
+		log.Infof("SimLoad %v", resp.StatusCode)
 		return "HOST_FOUND"
 	} else {
 		return "HOST_PORT_NOT_FOUND"
@@ -179,7 +178,7 @@ func (e *etcdCoordinator) statsLoad(ip string, port string) statResponse {
 	client := http.Client{
 		Timeout: 5 * time.Second,
 	}
-	resp, err := client.Get("http://" + ip + ":" + port + "/load/stats")
+	resp, err := client.Get("http://" + ip + ":" + port + "/loadtest/stats")
 	if err != nil {
 		hstats.Error = fmt.Sprintf("err %v", err)
 	} else {
@@ -217,7 +216,7 @@ func MirrorSfu(session, session2 string, host Host, nhost Host) {
 		}
 	}
 
-	apiurl := "http://" + host.Ip + ":" + host.Port + "/syncsfu/" + session + "/" + session2 + "/" + host.String() + "/" + nhost.String()
+	apiurl := "http://" + host.Ip + ":" + host.Port + "/mirror/syncsfu/" + session + "/" + session2 + "/" + host.String() + "/" + nhost.String()
 	log.Infof("api called %v", apiurl)
 	resp, err := http.Get(apiurl)
 	if err != nil {

@@ -1,4 +1,24 @@
-FROM golang:1.16-alpine as base
+# FROM golang:1.16 as golang
+# FROM gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+# COPY --from=golang /usr/local/go/ /usr/local/go/
+# ENV GOROOT=/usr/local/go/
+# ENV PATH=$PATH:/usr/local/go/bin/
+# RUN apt-get install -y make
+# RUN apt-get install -y default-jre
+# RUN apt-get install -y google-cloud-sdk-datastore-emulator google-cloud-sdk-app-engine-go
+# RUN go version
+FROM golang:1.16 as golang
+# COPY --from=base /sfu-coordinator /usr/local/bin/sfu-coordinator
+
+FROM gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+COPY --from=golang /usr/local/go/ /usr/local/go/
+
+ENV GOROOT=/usr/local/go/
+ENV PATH=$PATH:/usr/local/go/bin/
+RUN apt-get install -y make
+RUN apt-get install -y default-jre
+RUN go version
+
 
 ENV GO111MODULE=on
 ENV GIN_MODE=release
@@ -10,22 +30,11 @@ RUN cd $GOPATH/src/github.com/manishiitg/sfu-coordinator && go mod download
 COPY . $GOPATH/src/github.com/manishiitg/sfu-coordinator
 RUN GOOS=linux go build -o /sfu-coordinator .
 
-FROM google/cloud-sdk:alpine
-RUN apk --update add openjdk7-jre
-COPY --from=base /sfu-coordinator /usr/local/bin/sfu-coordinator
-
-RUN apk add --update \
- curl \
- which \
- bash
 
 COPY ./steady-datum-291915-386b3c696fb0.json /usr/src/app/steady-datum-291915-386b3c696fb0.json
 
-# RUN curl -sSL https://sdk.cloud.google.com | bash
-# ENV PATH $PATH:/root/google-cloud-sdk/bin
-
 RUN gcloud auth activate-service-account --key-file=/usr/src/app/steady-datum-291915-386b3c696fb0.json
-RUN gcloud config list
+# RUN gcloud config list
 RUN gcloud config set project steady-datum-291915
-
-ENTRYPOINT ["/usr/local/bin/sfu-coordinator"]
+  
+ENTRYPOINT ["/sfu-coordinator"]

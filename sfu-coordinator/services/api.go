@@ -113,51 +113,51 @@ func (e *etcdCoordinator) InitApi() {
 		resp := e.simLoad(c.Param("session"), no, role, cycle, rooms, file)
 		c.String(http.StatusOK, resp)
 	})
-	r.GET("/load/:session/:host/:port", func(c *gin.Context) {
-		clients := c.Query("clients")
-		no := 1
-		if clients != "" {
-			x, err := strconv.Atoi(clients)
-			if err == nil {
-				log.Errorf("error string to int ", err)
-			} else {
-				no = x
-			}
-		}
-		role := c.Query("role")
-		if len(role) == 0 || role == "pubsub" {
-			role = "pubsub"
-		} else {
-			role = "sub"
-		}
+	// r.GET("/load/:session/:host/:port", func(c *gin.Context) {
+	// 	clients := c.Query("clients")
+	// 	no := 1
+	// 	if clients != "" {
+	// 		x, err := strconv.Atoi(clients)
+	// 		if err == nil {
+	// 			log.Errorf("error string to int ", err)
+	// 		} else {
+	// 			no = x
+	// 		}
+	// 	}
+	// 	role := c.Query("role")
+	// 	if len(role) == 0 || role == "pubsub" {
+	// 		role = "pubsub"
+	// 	} else {
+	// 		role = "sub"
+	// 	}
 
-		qcycle := c.Query("cycle")
-		cycle := 0
-		if len(qcycle) != 0 {
-			x, err := strconv.Atoi(qcycle)
-			if err == nil {
-				cycle = x
-			}
-		}
-		qrooms := c.Query("rooms")
-		rooms := -1
-		if len(qrooms) != 0 {
-			x, err := strconv.Atoi(qrooms)
-			if err == nil {
-				rooms = x
-			}
-		}
+	// 	qcycle := c.Query("cycle")
+	// 	cycle := 0
+	// 	if len(qcycle) != 0 {
+	// 		x, err := strconv.Atoi(qcycle)
+	// 		if err == nil {
+	// 			cycle = x
+	// 		}
+	// 	}
+	// 	qrooms := c.Query("rooms")
+	// 	rooms := -1
+	// 	if len(qrooms) != 0 {
+	// 		x, err := strconv.Atoi(qrooms)
+	// 		if err == nil {
+	// 			rooms = x
+	// 		}
+	// 	}
 
-		file := c.Query("file")
-		if len(file) == 0 {
-			file = "default"
-		} else {
-			file = c.Query("file")
-		}
+	// 	file := c.Query("file")
+	// 	if len(file) == 0 {
+	// 		file = "default"
+	// 	} else {
+	// 		file = c.Query("file")
+	// 	}
 
-		go e.simLoadForHost(c.Param("session"), c.Param("host"), c.Param("port"), no, role, cycle, rooms, file, 1, -1)
-		c.Status(http.StatusOK)
-	})
+	// 	go e.simLoadForHost(c.Param("session"), c.Param("host"), c.Param("port"), no, role, cycle, rooms, file, 1, -1)
+	// 	c.Status(http.StatusOK)
+	// })
 	// /session/test/node/5.9.18.28:7002/peer/ckoy35usg00080110qpo13b3v
 	// r.GET("/clearsession", func(c *gin.Context) {
 	// 	e.cli.Delete(context.Background(), "/session/", clientv3.WithPrefix())
