@@ -2,11 +2,33 @@ package main
 
 import (
 	"flag"
-	"time"
+	"os"
+	"os/signal"
+	"runtime"
+	"syscall"
 
+	"github.com/manishiitg/actions/loadtest/client/gst"
 	tasktodisk "github.com/manishiitg/actions/tracktodisk"
 	log "github.com/pion/ion-log"
 )
+
+func compositeThread(session string, addr string) {
+
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+
+	cancel := make(chan struct{})
+	tasktodisk.Init(session, addr, "gstreamer", cancel)
+
+	for {
+		select {
+		case sig := <-sigs:
+			log.Infof("got signal %v", sig)
+			close(cancel)
+		}
+	}
+
+}
 
 func main() {
 	// init log
@@ -18,12 +40,9 @@ func main() {
 	flag.StringVar(&session, "session", "test2", "join session name")
 
 	flag.Parse()
-	cancel := make(chan struct{})
 
-	tasktodisk.Init(session, addr, cancel)
+	runtime.LockOSThread()
+	go compositeThread(session, addr)
+	gst.MainLoop()
 
-	time.AfterFunc(6*time.Second, func() {
-		close(cancel)
-	})
-	<-cancel
 }

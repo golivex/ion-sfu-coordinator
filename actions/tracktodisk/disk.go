@@ -9,6 +9,7 @@ import (
 
 	"github.com/lucsky/cuid"
 	connection "github.com/manishiitg/actions/connection"
+	"github.com/manishiitg/actions/loadtest/client/gst"
 	log "github.com/pion/ion-log"
 	sdk "github.com/pion/ion-sdk-go"
 	"github.com/pion/rtcp"
@@ -33,13 +34,12 @@ func newWebmSaver() *webmSaver {
 	}
 }
 
-func InitApi(serverip string, session string, cancel <-chan struct{}) *sdk.Engine {
-	return Init(session, serverip, cancel)
+func InitApi(serverip string, session string, vtype string, cancel <-chan struct{}) *sdk.Engine {
+	return Init(session, serverip, vtype, cancel)
 }
 
-func Init(session string, addr string, cancel <-chan struct{}) *sdk.Engine {
+func Init(session string, addr string, vtype string, cancel <-chan struct{}) *sdk.Engine {
 	// init log
-	log.Init("info")
 
 	// add stun servers
 	webrtcCfg := webrtc.Configuration{
@@ -73,52 +73,44 @@ func Init(session string, addr string, cancel <-chan struct{}) *sdk.Engine {
 	if err != nil {
 		log.Errorf("err=%v", err)
 	}
-	go run(e, client, session, cancel)
+	go run(e, client, session, vtype, cancel)
 	return e
 }
 
-func run(e *sdk.Engine, client *sdk.Client, session string, cancel <-chan struct{}) {
-	saver := newWebmSaver()
-	// subscribe rtp from sessoin
-	// comment this if you don't need save to file
-	client.OnTrack = func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
-		log.Infof("GOT TRACKTRACKTRACKTRACKTRACK") //, track, receiver
+func run(e *sdk.Engine, client *sdk.Client, session string, vtype string, cancel <-chan struct{}) {
+	if vtype == "gstreamer" {
+		compositeSavePath := "test.mp4"
 
-		// Send a PLI on an interval so that the publisher is pushing a keyframe every rtcpPLIInterval
-		go func() {
-			ticker := time.NewTicker(time.Second * 2)
-			for {
-				select {
-				case <-ticker.C:
-					// We need to add direct access to the peerconnection to ion-sdk-go to support PLI here
-					// PLI is disabled in this example currently
-					if rtcpErr := client.GetSubTransport().GetPeerConnection().WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(track.SSRC())}}); rtcpErr != nil {
-						fmt.Println(rtcpErr)
-					}
-				case <-cancel:
-					return
-				}
-			}
-		}()
+		encodePipeline := fmt.Sprintf(`
+				tee name=aenctee 
+				tee name=venctee
+				vtee. ! queue ! vtenc_h264 ! video/x-h264,chroma-site=mpeg2 ! venctee.
+				atee. ! queue ! faac ! aenctee.
+		`)
 
-		for {
-			// Read RTP packets being sent to Pion
-			rtp, _, readErr := track.ReadRTP()
-			if readErr != nil {
-				if readErr == io.EOF {
-					return
-				}
-				log.Infof("err %v", readErr)
-				break
-			}
-			switch track.Kind() {
-			case webrtc.RTPCodecTypeAudio:
-				saver.PushOpus(rtp)
-			case webrtc.RTPCodecTypeVideo:
-				saver.PushVP8(rtp)
-			}
+		encodePipeline += fmt.Sprintf(`
+				qtmux name=savemux ! queue ! filesink location=%s async=false sync=false
+				venctee. ! queue ! savemux.
+				aenctee. ! queue ! savemux. 
+			`, compositeSavePath)
+		log.Infof("saving encoded stream", "path", compositeSavePath)
+
+		log.Infof("encoding composited stream")
+
+		compositor := gst.NewCompositorPipeline(encodePipeline)
+		compositor.Play()
+		client.OnTrack = func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
+			compositor.AddInputTrack(track, client.GetSubTransport().GetPeerConnection())
 		}
+		defer compositor.Stop()
+	} else {
+		saver := newWebmSaver()
+		client.OnTrack = func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
+			go trackToDisk(track, receiver, saver, client, cancel)
+		}
+		defer saver.Close()
 	}
+
 	// client join a session
 
 	log.Infof("joining session=%v", session)
@@ -128,12 +120,48 @@ func run(e *sdk.Engine, client *sdk.Client, session string, cancel <-chan struct
 		log.Errorf("err=%v", err)
 	}
 
-	defer saver.Close()
-
 	select {
 	case <-cancel:
 		return
 	}
+}
+
+func trackToDisk(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver, saver *webmSaver, client *sdk.Client, cancel <-chan struct{}) {
+	log.Infof("GOT Track %v", track.Kind())
+
+	go func() {
+		ticker := time.NewTicker(time.Second * 2)
+		for {
+			select {
+			case <-ticker.C:
+				if rtcpErr := client.GetSubTransport().GetPeerConnection().WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(track.SSRC())}}); rtcpErr != nil {
+					fmt.Println(rtcpErr)
+				}
+			case <-cancel:
+				return
+			}
+		}
+	}()
+
+	for {
+		// Read RTP packets being sent to Pion
+		rtp, _, readErr := track.ReadRTP()
+		if readErr != nil {
+			if readErr == io.EOF {
+				return
+			}
+			log.Infof("err %v", readErr)
+			break
+		}
+		switch track.Kind() {
+		case webrtc.RTPCodecTypeAudio:
+			saver.PushOpus(rtp)
+		case webrtc.RTPCodecTypeVideo:
+			fmt.Println("video")
+			saver.PushVP8(rtp)
+		}
+	}
+
 }
 
 func (s *webmSaver) Close() {
@@ -172,10 +200,12 @@ func (s *webmSaver) PushVP8(rtpPacket *rtp.Packet) {
 	for {
 		sample := s.videoBuilder.Pop()
 		if sample == nil {
+			fmt.Println("nil sample")
 			return
 		}
 		// Read VP8 header.
 		videoKeyframe := (sample.Data[0]&0x1 == 0)
+		fmt.Println("videoKeyframe %v", videoKeyframe)
 		if videoKeyframe {
 			// Keyframe has frame information.
 			raw := uint(sample.Data[6]) | uint(sample.Data[7])<<8 | uint(sample.Data[8])<<16 | uint(sample.Data[9])<<24
@@ -196,6 +226,7 @@ func (s *webmSaver) PushVP8(rtpPacket *rtp.Packet) {
 	}
 }
 func (s *webmSaver) InitWriter(width, height int) {
+	fmt.Println("init writer")
 	log.Infof("webm init writer")
 	w, err := os.OpenFile("test.webm", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {

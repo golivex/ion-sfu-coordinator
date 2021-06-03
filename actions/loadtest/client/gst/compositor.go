@@ -36,6 +36,8 @@ func NewCompositorPipeline(extraPipelineStr string) *CompositorPipeline {
 		audiomixer name=amix ! queue ! tee name=atee 
 			atee. ! queue ! audioconvert ! autoaudiosink
 	` + extraPipelineStr
+
+	fmt.Println("pipeline %v", pipelineStr)
 	pipelineStrUnsafe := C.CString(pipelineStr)
 	defer C.free(unsafe.Pointer(pipelineStrUnsafe))
 

@@ -64,14 +64,19 @@ func (s *webmSaver) PushOpus(rtpPacket *rtp.Packet) {
 	}
 }
 func (s *webmSaver) PushVP8(rtpPacket *rtp.Packet) {
+	fmt.Printf("xx %v", rtpPacket)
 	s.videoBuilder.Push(rtpPacket)
+	fmt.Print("yy")
 
 	for {
 		sample := s.videoBuilder.Pop()
+		// fmt.Println("sample %v", sample)
 		if sample == nil {
+			fmt.Println("ret")
 			return
 		}
 		// Read VP8 header.
+		fmt.Print("here 76")
 		videoKeyframe := (sample.Data[0]&0x1 == 0)
 		if videoKeyframe {
 			// Keyframe has frame information.
@@ -90,6 +95,7 @@ func (s *webmSaver) PushVP8(rtpPacket *rtp.Packet) {
 				panic(err)
 			}
 		}
+		fmt.Print("loop finished")
 	}
 }
 func (s *webmSaver) InitWriter(width, height int) {
@@ -134,12 +140,12 @@ func (s *webmSaver) InitWriter(width, height int) {
 
 func main() {
 	// init log
-	log.Init("info")
+	log.Init("debug")
 
 	// parse flag
 	var session, addr string
 	flag.StringVar(&addr, "addr", "localhost:50052", "Ion-sfu grpc addr")
-	flag.StringVar(&session, "session", "test", "join session name")
+	flag.StringVar(&session, "session", "test2", "join session name")
 	flag.Parse()
 
 	saver := newWebmSaver()
@@ -154,16 +160,13 @@ func main() {
 	}
 
 	config := sdk.Config{
-		Log: log.Config{
-			Level: "warn",
-		},
 		WebRTC: sdk.WebRTCTransportConfig{
 			Configuration: webrtcCfg,
 		},
 	}
 	// new sdk engine
 	e := sdk.NewEngine(config)
-
+	// new sdk engine
 	// create a new client from engine
 	client, err := sdk.NewClient(e, addr, "clientid")
 	if err != nil {
@@ -174,43 +177,53 @@ func main() {
 	// subscribe rtp from sessoin
 	// comment this if you don't need save to file
 	client.OnTrack = func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
-		log.Infof("GOT TRACKTRACKTRACKTRACKTRACK") //, track, receiver
-
-		// Send a PLI on an interval so that the publisher is pushing a keyframe every rtcpPLIInterval
-		go func() {
-			ticker := time.NewTicker(time.Second * 2)
-			for range ticker.C {
-
-				// We need to add direct access to the peerconnection to ion-sdk-go to support PLI here
-				// PLI is disabled in this example currently
-
-				if rtcpErr := client.GetSubTransport().GetPeerConnection().WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(track.SSRC())}}); rtcpErr != nil {
-					fmt.Println(rtcpErr)
-				}
-			}
-		}()
-
-		for {
-			// Read RTP packets being sent to Pion
-			rtp, _, readErr := track.ReadRTP()
-			if readErr != nil {
-				if readErr == io.EOF {
-					return
-				}
-				panic(readErr)
-			}
-			switch track.Kind() {
-			case webrtc.RTPCodecTypeAudio:
-				saver.PushOpus(rtp)
-			case webrtc.RTPCodecTypeVideo:
-				saver.PushVP8(rtp)
-			}
+		if track.Kind().String() == "audio" {
+			return
 		}
+		go func() {
+
+			log.Infof("GOT TRACKTRACKTRACKTRACKTRACK") //, track, receiver
+
+			// Send a PLI on an interval so that the publisher is pushing a keyframe every rtcpPLIInterval
+			go func() {
+				ticker := time.NewTicker(time.Second * 2)
+				for range ticker.C {
+
+					// We need to add direct access to the peerconnection to ion-sdk-go to support PLI here
+					// PLI is disabled in this example currently
+
+					if rtcpErr := client.GetSubTransport().GetPeerConnection().WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(track.SSRC())}}); rtcpErr != nil {
+						fmt.Println(rtcpErr)
+					}
+				}
+			}()
+
+			for {
+				// Read RTP packets being sent to Pion
+				fmt.Print(track.Kind())
+				rtp, _, readErr := track.ReadRTP()
+				if readErr != nil {
+					log.Infof("heree %v", readErr)
+					if readErr == io.EOF {
+						return
+					}
+					panic(readErr)
+				}
+				switch track.Kind() {
+				case webrtc.RTPCodecTypeAudio:
+					// saver.PushOpus(rtp)
+				case webrtc.RTPCodecTypeVideo:
+					saver.PushVP8(rtp)
+				}
+			}
+			log.Infof("log tack closed")
+
+		}()
 	}
 	// client join a session
 
 	log.Infof("joining session=%v", session)
-	err = client.Join(session)
+	err = client.Join(session, nil)
 	if err != nil {
 		log.Errorf("err=%v", err)
 	}
