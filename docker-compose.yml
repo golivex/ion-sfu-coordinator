@@ -20,6 +20,16 @@ services:
         depends_on:
             - etcd
 
+    admin:
+        image: xtechsample/admin
+        container_name: admin
+        build:
+            context : ./admin
+        restart: always
+        network_mode: host
+        depends_on:
+            - etcd
+
     actions:
         image: xtechsample/actions
         container_name: actions

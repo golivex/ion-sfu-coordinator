@@ -39,9 +39,6 @@ func InitApi(serverip string, session string, vtype string, cancel <-chan struct
 }
 
 func Init(session string, addr string, vtype string, cancel <-chan struct{}) *sdk.Engine {
-	// init log
-
-	// add stun servers
 	webrtcCfg := webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			webrtc.ICEServer{

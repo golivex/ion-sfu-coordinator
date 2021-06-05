@@ -22,9 +22,13 @@ require (
 	github.com/pion/rtcp v1.2.6
 	github.com/pion/rtp v1.6.5 // indirect
 	github.com/pion/webrtc/v3 v3.0.29
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/shirou/gopsutil/v3 v3.21.4 // indirect
 	github.com/sirupsen/logrus v1.8.1
 	github.com/ugorji/go v1.2.6 // indirect
+	github.com/yutopp/go-amf0 v0.0.0-20180803120851-48851794bb1f // indirect
+	github.com/yutopp/go-flv v0.2.0 // indirect
+	github.com/yutopp/go-rtmp v0.0.1 // indirect
 	go.etcd.io/etcd/api/v3 v3.5.0-alpha.0
 	go.etcd.io/etcd/client/v3 v3.5.0-alpha.0
 	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a // indirect
