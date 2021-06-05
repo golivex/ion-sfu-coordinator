@@ -1,48 +1,36 @@
-package main
+package cmd
 
 import (
-	"flag"
-	"os"
-	"os/signal"
 	"runtime"
-	"syscall"
 
 	"github.com/manishiitg/actions/loadtest/client/gst"
 	tasktodisk "github.com/manishiitg/actions/tracktodisk"
-	log "github.com/pion/ion-log"
+	"github.com/spf13/cobra"
 )
 
-func compositeThread(session string, addr string) {
-
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-
-	cancel := make(chan struct{})
-	tasktodisk.Init(session, addr, "gstreamer", cancel)
-
-	for {
-		select {
-		case sig := <-sigs:
-			log.Infof("got signal %v", sig)
-			close(cancel)
-		}
-	}
-
+var diskCmd = &cobra.Command{
+	Use:   "savetodisk",
+	Short: "start the actions server",
+	RunE:  diskMain,
 }
 
-func main() {
-	// init log
-	log.Init("info")
+// parse flag
+var sessionf, addrf string
 
-	// parse flag
-	var session, addr string
-	flag.StringVar(&addr, "addr", "http://0.0.0.0:4000/", "SFU Cordinator")
-	flag.StringVar(&session, "session", "test2", "join session name")
+func init() {
+	diskCmd.PersistentFlags().StringVarP(&addrf, "addr", "a", "http://0.0.0.0:4000/", "SFU Cordinator")
+	diskCmd.PersistentFlags().StringVarP(&sessionf, "session", "s", "test", "session to join")
+	rootCmd.AddCommand(diskCmd)
+}
 
-	flag.Parse()
+func compositeThread() {
+	cancel := make(chan struct{})
+	tasktodisk.Init(sessionf, addrf, "webm", cancel)
+}
 
+func diskMain(cmd *cobra.Command, args []string) error {
 	runtime.LockOSThread()
-	go compositeThread(session, addr)
+	go compositeThread()
 	gst.MainLoop()
-
+	return nil
 }

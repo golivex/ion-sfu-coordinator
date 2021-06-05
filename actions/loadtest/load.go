@@ -37,11 +37,8 @@ func DownloadFile(filepath string, url string) error {
 	return err
 }
 
-func InitLoadTestApi(serverIp string, session string, clients int, role string, cycle int, rooms int, file string, capacity int, cancel chan struct{}) *sdk.Engine {
-	if clients == 0 {
-		clients = 1
-	}
-	filepath := "test"
+func getFileByType(file string) string {
+	var filepath string
 	if file == "360p" {
 		filepath = "/var/tmp/Big_Buck_Bunny_4K.webm.360p.webm"
 		if _, err := os.Stat(filepath); os.IsNotExist(err) {
@@ -86,11 +83,26 @@ func InitLoadTestApi(serverIp string, session string, clients int, role string, 
 			}
 		}
 	}
-	log.Infof("filepath %v", filepath)
-	return Init(filepath, serverIp, session, clients, cycle, 60*60, role, true, true, "", "", rooms, capacity, cancel)
+
+	return filepath
 }
 
-func Init(file, gaddr, session string, total, cycle, duration int, role string, video bool, audio bool, simulcast string, paddr string, create_room int, capacity int, cancel chan struct{}) *sdk.Engine {
+func InitLoadTestApi(serverIp string, session string, clients int, role string, cycle int, rooms int, file string, capacity int, cancel chan struct{}) *sdk.Engine {
+	if clients == 0 {
+		clients = 1
+	}
+	filepath := getFileByType(file)
+	return Init(filepath, serverIp, session, clients, cycle, 60*60, role, rooms, capacity, cancel)
+}
+
+func Init(file, gaddr, session string, total, cycle, duration int, role string, create_room int, capacity int, cancel chan struct{}) *sdk.Engine {
+	file = getFileByType(file)
+	log.Infof("filepath %v", file)
+	video := true
+	audio := true
+	paddr := ""
+	simulcast := ""
+
 	se := webrtc.SettingEngine{}
 	se.SetEphemeralUDPPortRange(10000, 15000)
 	webrtcCfg := webrtc.Configuration{
@@ -124,11 +136,8 @@ func run(e *sdk.Engine, addr, session, file, role string, total, duration, cycle
 
 	go e.Stats(3, cancel)
 
-	// var wg sync.WaitGroup
 	for i := 0; i < total; i++ {
-		// wg.Add(1)
 		go func(i int, session string) {
-			// defer wg.Done()
 			new_session := session
 			if create_room != -1 {
 				new_session = new_session + fmt.Sprintf("%v", i%create_room)
@@ -261,6 +270,4 @@ func run(e *sdk.Engine, addr, session, file, role string, total, duration, cycle
 		time.Sleep(time.Millisecond * time.Duration(cycle))
 	}
 	return e
-	// wg.Wait()
-
 }

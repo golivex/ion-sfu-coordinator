@@ -16,3 +16,4 @@ pion-tools/ion-cluster
 pion-tools/track-to-disk/testwebm
 pkg
 pkg/*
+actions/out/*

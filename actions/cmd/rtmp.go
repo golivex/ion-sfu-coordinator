@@ -1,4 +1,4 @@
-package main
+package cmd
 
 import (
 	"flag"
@@ -7,7 +7,7 @@ import (
 	log "github.com/pion/ion-log"
 )
 
-func main() {
+func loadrtmp() {
 	// init log
 	log.Init("info")
 

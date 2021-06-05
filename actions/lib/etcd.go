@@ -35,7 +35,7 @@ type etcdCoordinator struct {
 	serverIp           string
 }
 
-func InitEtcd(eaddr string, ipaddr string, port string, saddr string) (e *etcdCoordinator) {
+func InitEtcd(eaddr string, ipaddr string, port string, saddr string) (e *etcdCoordinator, err error) {
 	cli, err := clientv3.New(clientv3.Config{
 		Endpoints:   []string{eaddr},
 		DialOptions: []grpc.DialOption{grpc.WithBlock()},
@@ -43,7 +43,7 @@ func InitEtcd(eaddr string, ipaddr string, port string, saddr string) (e *etcdCo
 	})
 	if err != nil {
 		log.Errorf("unable to connect to etcd", err)
-		return
+		return nil, err
 	}
 	log.Infof("etcd client connected", "eaddr", eaddr, "ipaddr", ipaddr, "port", port, "saddr", saddr)
 	kvc := clientv3.NewKV(cli)
@@ -71,7 +71,7 @@ func InitEtcd(eaddr string, ipaddr string, port string, saddr string) (e *etcdCo
 		}
 	}()
 
-	return etcdObj
+	return etcdObj, nil
 }
 
 type Load struct {

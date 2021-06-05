@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func (e *etcdCoordinator) InitApi(port string) {
+func (e *etcdCoordinator) InitApi(port string) error {
 	r := gin.Default()
 	r.Use(cors.Default())
 	r.GET("/", func(c *gin.Context) {
@@ -65,5 +65,5 @@ func (e *etcdCoordinator) InitApi(port string) {
 		})
 	}
 
-	r.Run(port)
+	return r.Run(port)
 }

@@ -1,44 +1,42 @@
-package main
+package cmd
 
 import (
-	"flag"
-
 	loadtest "github.com/manishiitg/actions/loadtest"
 	"github.com/manishiitg/actions/loadtest/client/gst"
-	log "github.com/pion/ion-log"
+	"github.com/spf13/cobra"
 )
 
+var loadCmd = &cobra.Command{
+	Use:   "loadtest",
+	Short: "start the actions server",
+	RunE:  loadMain,
+}
+
+var session, gaddr, file, role, loglevel, simulcast, paddr string
+var total, cycle, duration int
+var create_room = -1
+
+func init() {
+	loadCmd.PersistentFlags().StringVarP(&file, "file", "f", "480p", "type of file either test 360p 480p 720p h246")
+	loadCmd.PersistentFlags().StringVarP(&gaddr, "gaddr", "g", "http://0.0.0.0:4000/", "SFU Cordinator")
+	loadCmd.PersistentFlags().StringVarP(&session, "session", "s", "test", "join session name")
+	loadCmd.PersistentFlags().IntVarP(&total, "clients", "c", 1, "Number of clients to start")
+	loadCmd.PersistentFlags().IntVarP(&cycle, "cycle", "y", 1000, "Run new client cycle in ms")
+	loadCmd.PersistentFlags().IntVarP(&duration, "duration", "d", 60*60, "Running duration in seconds")
+	loadCmd.PersistentFlags().StringVarP(&role, "role", "r", "pubsub", "Run as pubsub/sub")
+	loadCmd.PersistentFlags().IntVarP(&create_room, "create_room", "x", -1, "number of peers per room")
+	rootCmd.AddCommand(loadCmd)
+}
+
 func clientThread() {
-	//get args
-	var session, gaddr, file, role, loglevel, simulcast, paddr string
-	var total, cycle, duration int
-	var video, audio bool
 
-	var create_room = -1
-
-	flag.StringVar(&file, "file", "480p", "Path to the file media")
-	flag.StringVar(&gaddr, "gaddr", "http://0.0.0.0:4000/", "SFU Cordinator")
-	flag.StringVar(&session, "session", "test", "join session name")
-	flag.IntVar(&total, "clients", 1, "Number of clients to start")
-	flag.IntVar(&cycle, "cycle", 1000, "Run new client cycle in ms")
-	flag.IntVar(&duration, "duration", 60*60, "Running duration in sencond")
-	flag.StringVar(&role, "role", "pubsub", "Run as pubsub/sub")
-	flag.StringVar(&loglevel, "log", "info", "Log level")
-	flag.BoolVar(&video, "v", true, "Publish video stream from webm file")
-	flag.BoolVar(&audio, "a", true, "Publish audio stream from webm file")
-	flag.StringVar(&simulcast, "simulcast", "", "simulcast layer q|h|f")
-	flag.StringVar(&paddr, "paddr", "", "pprof listening addr")
-	flag.IntVar(&create_room, "create_room", -1, "number of peers per room")
-	flag.Parse()
-	log.Init(loglevel)
-
-	cancel := make(chan struct{})
-	go loadtest.Init(file, gaddr, session, total, cycle, duration, role, video, audio, simulcast, paddr, create_room, -1, cancel)
-	// Listen for signals
+	cancel := make(chan struct{}) // not used as such
+	go loadtest.Init(file, gaddr, session, total, cycle, duration, role, create_room, -1, cancel)
 
 }
 
-func main() {
+func loadMain(cmd *cobra.Command, args []string) error {
 	go clientThread()
 	gst.MainLoop()
+	return nil
 }

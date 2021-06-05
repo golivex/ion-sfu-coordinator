@@ -17,6 +17,7 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.1 // indirect
 	github.com/petar/GoLLRB v0.0.0-20210522233825-ae3b015fd3e9 // indirect
+	github.com/pion/ion-avp v1.8.4 // indirect
 	github.com/pion/ion-log v1.2.0
 	github.com/pion/ion-sdk-go v0.5.1-0.20210523062803-1e8126477a4c
 	github.com/pion/rtcp v1.2.6
@@ -25,6 +26,8 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/shirou/gopsutil/v3 v3.21.4 // indirect
 	github.com/sirupsen/logrus v1.8.1
+	github.com/spf13/cobra v1.1.3 // indirect
+	github.com/spf13/viper v1.7.1 // indirect
 	github.com/ugorji/go v1.2.6 // indirect
 	github.com/yutopp/go-amf0 v0.0.0-20180803120851-48851794bb1f // indirect
 	github.com/yutopp/go-flv v0.2.0 // indirect
