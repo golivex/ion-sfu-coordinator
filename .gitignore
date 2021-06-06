@@ -17,3 +17,5 @@ pion-tools/track-to-disk/testwebm
 pkg
 pkg/*
 actions/out/*
+bin/
+bin/*
