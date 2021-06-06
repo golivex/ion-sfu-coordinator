@@ -19,3 +19,5 @@ pkg/*
 actions/out/*
 bin/
 bin/*
+.vscode
+.vscode/*
