@@ -16,7 +16,7 @@ func (e *etcdCoordinator) InitApi() {
 		c.Status(http.StatusOK)
 	})
 	r.GET("/stats", func(c *gin.Context) {
-		//TODO add infor about machines also here from e.cloud
+		//TODO add infor about machines also here
 		c.JSON(200, gin.H{
 			"hosts":       e.hosts,
 			"sessions":    e.sessions,
@@ -45,20 +45,8 @@ func (e *etcdCoordinator) InitApi() {
 		host := e.FindHost(id, cap, role)
 		c.JSON(200, host)
 	})
-	r.GET("/load/stats", func(c *gin.Context) {
-		hosts := e.statsLoadAll()
-		c.JSON(http.StatusOK, gin.H{
-			"Response": hosts,
-		})
-	})
 	r.GET("/load/stats/:host/:port", func(c *gin.Context) {
 		hosts := e.statsLoad(c.Param("host"), c.Param("port"))
-		c.JSON(http.StatusOK, gin.H{
-			"Response": hosts,
-		})
-	})
-	r.GET("/stopload", func(c *gin.Context) {
-		hosts := e.stopAllSimLoad()
 		c.JSON(http.StatusOK, gin.H{
 			"Response": hosts,
 		})
@@ -67,6 +55,19 @@ func (e *etcdCoordinator) InitApi() {
 		resp := e.stopSimLoad(c.Param("host"), c.Param("port"))
 		c.JSON(http.StatusOK, gin.H{
 			"Response": resp,
+		})
+	})
+
+	r.GET("/load/stats", func(c *gin.Context) {
+		hosts := e.statsLoadAll()
+		c.JSON(http.StatusOK, gin.H{
+			"Response": hosts,
+		})
+	})
+	r.GET("/stopload", func(c *gin.Context) {
+		hosts := e.stopAllSimLoad()
+		c.JSON(http.StatusOK, gin.H{
+			"Response": hosts,
 		})
 	})
 	r.GET("/load/:session", func(c *gin.Context) {
@@ -113,6 +114,38 @@ func (e *etcdCoordinator) InitApi() {
 		resp := e.simLoad(c.Param("session"), no, role, cycle, rooms, file)
 		c.String(http.StatusOK, resp)
 	})
+
+	r.GET("/disk/:session/:filename", func(c *gin.Context) {
+		session := c.Param("session")
+		filename := c.Param("filename")
+		resp := e.saveSessionToDisk(session, filename)
+		c.String(http.StatusOK, resp)
+	})
+	r.GET("/stopdisk/:session", func(c *gin.Context) {
+		resp := e.stopSessionToDisk(c.Param("session"))
+		c.String(http.StatusOK, resp)
+	})
+
+	r.GET("/stream/:session", func(c *gin.Context) {
+		session := c.Param("session")
+		resp := e.startStream(session, c.Query("rtmp"))
+		c.String(http.StatusOK, resp)
+	})
+	r.GET("/stopstream/:session", func(c *gin.Context) {
+		resp := e.stopStream(c.Param("session"))
+		c.String(http.StatusOK, resp)
+	})
+
+	r.GET("/rtmp/:session", func(c *gin.Context) {
+		session := c.Param("session")
+		resp := e.startRtmp(session, c.Query("rtmp"))
+		c.String(http.StatusOK, resp)
+	})
+	r.GET("/stoprtmp/:session", func(c *gin.Context) {
+		resp := e.stopRtmp(c.Param("session"))
+		c.String(http.StatusOK, resp)
+	})
+
 	// r.GET("/load/:session/:host/:port", func(c *gin.Context) {
 	// 	clients := c.Query("clients")
 	// 	no := 1

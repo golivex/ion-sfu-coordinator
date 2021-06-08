@@ -121,7 +121,7 @@ func (h *Hub) checkDeadActionNodes() {
 	}
 }
 
-func (h *Hub) StartActionServerNotify(capacity int, notify chan<- string) bool {
+func (h *Hub) StartActionServerNotify(capacity int, atype string, notify chan<- string) bool {
 
 	amcount := 0
 	for _, m := range h.machines {
@@ -138,7 +138,7 @@ func (h *Hub) StartActionServerNotify(capacity int, notify chan<- string) bool {
 		return false
 	}
 
-	m, err := StartInstance(capacity, -1, true)
+	m, err := StartInstance(capacity, -1, true, atype)
 	if err != nil {
 		log.Errorf("unable to start server %v", err)
 		return false

@@ -83,7 +83,7 @@ func (h *Hub) startDefaultServer() {
 			h.cloudOp = true
 			h.Unlock()
 			go func() {
-				m, err := StartInstance(-1, -1, false)
+				m, err := StartInstance(-1, -1, false, "")
 				if err != nil {
 					log.Errorf("unable to start server %v", err)
 				} else {
@@ -113,7 +113,7 @@ func (h *Hub) StartServerNotify(capacity int, session string, notify chan<- stri
 		h.Lock()
 		h.cloudOp = true
 		h.Unlock()
-		m, err := StartInstance(capacity, -1, false)
+		m, err := StartInstance(capacity, -1, false, "")
 		if err != nil {
 			log.Errorf("unable to start server %v", err)
 			h.Lock()

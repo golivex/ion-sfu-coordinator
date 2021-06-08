@@ -2,11 +2,27 @@ package coordinator
 
 import (
 	"context"
+	"net/http"
+	"time"
 
 	log "github.com/pion/ion-log"
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
+
+func (e *etcdCoordinator) checkActionNode(host string, port string) bool {
+	apiurl := "http://" + host + ":" + port
+	log.Infof("api called %v", apiurl)
+	client := http.Client{
+		Timeout: 5 * time.Second,
+	}
+	_, err := client.Get(apiurl)
+	if err != nil {
+		log.Errorf("%v", err)
+		return false
+	}
+	return true
+}
 
 func (e *etcdCoordinator) getReadyActionHost() *Host {
 	var h *Host
@@ -32,12 +48,12 @@ func (e *etcdCoordinator) getActionHostByIp(ip string) *Host {
 	return h
 }
 
-func (e *etcdCoordinator) startActionHost(capacity int) chan string {
+func (e *etcdCoordinator) startActionHost(capacity int, atype string) chan string {
 	notifyip := make(chan string, 1)
 	log.Infof("startActionHost %v", capacity)
 	go func() {
 		log.Infof("starting action machine with capacity %v", capacity)
-		if e.cloud.StartActionServerNotify(capacity, notifyip) {
+		if e.cloud.StartActionServerNotify(capacity, atype, notifyip) {
 			log.Infof("waiting for ip of action machine")
 		} else {
 			log.Infof("unable to start action machine")

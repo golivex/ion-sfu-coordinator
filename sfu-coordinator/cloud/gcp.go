@@ -60,7 +60,7 @@ func GetInstanceCapablity(mtype string) int {
 	return -1
 }
 
-func StartInstance(capacity int, zoneidx int, isaction bool) (machine, error) {
+func StartInstance(capacity int, zoneidx int, isaction bool, prefix string) (machine, error) {
 	var m machine
 	ex := GetInstanceList()
 
@@ -151,7 +151,7 @@ func StartInstance(capacity int, zoneidx int, isaction bool) (machine, error) {
 
 	if err != nil {
 		log.Errorf("StartServer %v", err)
-		return StartInstance(capacity, zoneidx+1, isaction)
+		return StartInstance(capacity, zoneidx+1, isaction, prefix)
 	}
 	// log.Debugf("output %v", string(output))
 

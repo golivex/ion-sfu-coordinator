@@ -2,6 +2,7 @@ version: "3.7"
 
 services:
     etcd:
+        container_name: etcd
         image: gcr.io/etcd-development/etcd:v3.4.9
         entrypoint: "/usr/local/bin/etcd"
         command: "--listen-client-urls http://0.0.0.0:2379 --advertise-client-urls http://0.0.0.0:2379"
@@ -30,17 +31,9 @@ services:
         depends_on:
             - etcd
 
-    actions:
-        image: xtechsample/actions
-        container_name: actions
-        build:
-            context : actions
-        command: ["-port", ":3050", "-ipaddr" , "5.9.18.28" , "-saddr","http://5.9.18.28:4000/"] # "-eaddr", "5.9.18.28:2379",
-        # restart: always // stop actions from working
-        network_mode: host
-
     
     sfu:
+        container_name: sfu
         image: xtechsample/ion-sfu:latest-allrpc
         build: 
             context: ./ion-sfu
@@ -49,6 +42,8 @@ services:
         volumes:
             - "./cfgs/sfuA.toml:/configs/sfu.toml"
         network_mode: host
+        depends_on:
+            - etcd
         # ports:
         #     - "10000-11000:10000-11000/udp"
         #     - 7001:7001
