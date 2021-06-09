@@ -25,6 +25,107 @@
           stop load test
         </v-btn>
       </v-col>
+      <v-col class="text-right">
+        <v-btn
+          class="text-capitalize"
+          depressed
+          :loading="isDiskSaving"
+          v-if="!diskSavingStatus"
+          :disabled="isDiskSaving"
+          @click="$refs.startDiskDialog.open()"
+        >
+          start disk saving
+        </v-btn>
+        <v-btn
+          class="text-capitalize"
+          depressed
+          color="error"
+          v-if="diskSavingStatus"
+          :loading="isDiskSaving"
+          :disabled="isDiskSaving"
+          @click="handleStopDisk"
+        >
+          stop disk saving
+        </v-btn>
+      </v-col>
+      <v-col class="text-right">
+        <v-btn
+          class="text-capitalize"
+          depressed
+          :loading="isStreaming"
+          v-if="!liveStreamingStatus"
+          :disabled="isStreaming"
+          @click="openSessionDialog('Stream', 'Live')"
+        >
+          start live stream
+        </v-btn>
+        <v-btn
+          class="text-capitalize"
+          depressed
+          color="error"
+          v-if="liveStreamingStatus"
+          :loading="isDiskSaving"
+          :disabled="isDiskSaving"
+          @click="handleStopStreaming"
+        >
+          stop live stream
+        </v-btn>
+      </v-col>
+      <v-col class="text-right">
+        <v-btn
+          class="text-capitalize"
+          depressed
+          :loading="isLiveRtmp"
+          v-if="!liveRtmpStatus"
+          :disabled="isLiveRtmp"
+          @click="openSessionDialog('Rtmp','Live')"
+        >
+          start live rtmp
+        </v-btn>
+        <v-btn
+          class="text-capitalize"
+          depressed
+          color="error"
+          v-if="liveRtmpStatus"
+          :loading="isLiveRtmp"
+          :disabled="isLiveRtmp"
+          @click="handleStopLiveRtmp"
+        >
+          stop live rtmp
+        </v-btn>
+      </v-col>
+      <v-col class="text-right">
+        <!-- <v-btn
+          class="text-capitalize"
+          depressed
+          :loading="isDemoLoader"
+          :disabled="isDemoLoader"
+          @click="handleDemoFor"
+        >
+          Stop Demo
+        </v-btn> -->
+        <v-menu offset-y>
+        <template v-slot:activator="{ on, attrs }">
+         <v-btn
+          color="primary"
+          dark
+          v-bind="attrs"
+          v-on="on"
+        >
+          Demos
+        </v-btn>
+      </template>
+      <v-list>
+        <v-list-item
+          v-for="(item, index) in items"
+          :key="index"
+          @click="openSessionDialog(item.title, 'Demo')"
+        >
+          <v-list-item-title>{{ item.title }}</v-list-item-title>
+        </v-list-item>
+      </v-list>
+    </v-menu>
+      </v-col>
     </v-row>
 
     <!-- HOSTS SECTION -->
@@ -117,12 +218,18 @@
       ref="startLoadTestDialog"
       @submit="handleStartLoadTest"
     />
+    
+    <start-disk-save-dialog ref="startDiskDialog" @submitDisk="handleDiskSaving"/>
+
+    <session-name-dialog ref="askSessionDialog" :sessionDialogContent="sessionDialogContent" @submitLiveStream="handleLiveStream" @submitLiveRtmp="handleLiveRtmp" @submitDemoStream="handleDemoLiveStream" @submitDemoRtmp="handleDemoLiveRtmp" />
   </v-container>
 </template>
 
 <script>
 import LineChart from "@/components/LineChart.vue";
 import StartLoadTestDialog from "@/components/StartLoadTestDialog.vue";
+import SessionNameDialog from "@/components/AskSessionNameDialog.vue";
+import StartDiskSaveDialog from "@/components/StartDiskSaveDialog.vue";
 import { mapActions, mapGetters } from "vuex";
 
 export default {
@@ -131,6 +238,8 @@ export default {
   components: {
     LineChart,
     StartLoadTestDialog,
+    SessionNameDialog,
+    StartDiskSaveDialog
   },
 
   data() {
@@ -140,6 +249,15 @@ export default {
       getStatsIntervalInSeconds: 5, // should be set to 5
       fetchLoadStatsIntervalInSeconds: 10, // should be set to 10
       isLoadTestNC: false,
+      isDiskSaving: false,
+      isStreaming: false,
+      isLiveRtmp: false,
+      isDemoLoader: false,
+      sessionDialogContent: {},
+      items: [
+        { title: 'Stream' },
+        { title: 'Rtmp' }
+      ],
     };
   },
 
@@ -161,6 +279,9 @@ export default {
   computed: {
     ...mapGetters("Stats", ["getStats"]),
     ...mapGetters("Load", ["getLoadTestingStatus", "getLoadStatus"]),
+    ...mapGetters("Disk", ["getdiskSavingStatus"]),
+    ...mapGetters("Stream", ["getliveStreamingStatus"]),
+    ...mapGetters("Rtmp", ["getliveRtmpStatus"]),
 
     hosts() {
       for (const key in this.getStats.hosts) {
@@ -221,11 +342,24 @@ export default {
     isLoadTesting() {
       return this.getLoadTestingStatus;
     },
+
+    diskSavingStatus() {
+      return this.getdiskSavingStatus
+    },
+    liveStreamingStatus() {
+      return this.getliveStreamingStatus
+    },
+    liveRtmpStatus() {
+      return this.getliveRtmpStatus
+    }
   },
 
   methods: {
     ...mapActions("Stats", ["fetchStats"]),
     ...mapActions("Load", ["startLoadTest", "stopLoadTest", "fetchLoadStats"]),
+    ...mapActions("Disk", ["startDiskSave", "stopDiskSave"]),
+    ...mapActions("Stream", ["startLiveStream", "stopLiveStream", "demoLiveStream"]),
+    ...mapActions("Rtmp", ["startLiveRtmp", "stopLiveRtmp", "demoLiveRtmp"]),
 
     getStatsData() {
       this.fetchStats();
@@ -281,6 +415,67 @@ export default {
         return acc;
       }, []);
     },
+
+    async handleDiskSaving(param) {
+      this.isDiskSaving = true
+      await this.startDiskSave(param)
+      this.isDiskSaving = false
+    },
+
+    async handleStopDisk() {
+      this.isDiskSaving = true
+      await this.stopDiskSave()
+      this.isDiskSaving = false
+    },
+    
+    async handleLiveStream(param) {
+      this.isStreaming = true
+      await this.startLiveStream(param)
+      this.isStreaming = false
+    },
+
+    async handleStopStreaming() {
+      this.isStreaming = true
+      await this.stopLiveStream()
+      this.isStreaming = false
+    },
+
+    async handleDemoLiveStream(param) {
+      this.isDemoLoader = true
+      await this.demoLiveStream(param)
+      this.isDemoLoader = false
+    },
+
+    async handleLiveRtmp(param) {
+      this.isLiveRtmp = true
+      await this.startLiveRtmp(param)
+      this.isLiveRtmp = false
+    },
+
+    async handleStopLiveRtmp() {
+      this.isLiveRtmp = true
+      await this.stopLiveRtmp()
+      this.isLiveRtmp = false
+    },
+
+    async handleDemoLiveRtmp(param) {
+      this.isDemoLoader = true
+      await this.demoLiveRtmp(param)
+      this.isDemoLoader = false
+    },
+
+    openSessionDialog(header, type) {
+      const param = {
+        header: header,
+        type: type
+      }
+      this.sessionDialogContent = param
+      this.$refs.askSessionDialog.open()
+    },
+
+    handleDemoFor() {
+      console.log("CLOSE DEMO")
+    }
   },
 
   beforeDestroy() {
