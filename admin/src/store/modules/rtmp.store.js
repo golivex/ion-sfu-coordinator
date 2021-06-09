@@ -58,7 +58,7 @@ const actions = {
 
 const mutations = {
     SET_LIVE_RTMP_STATUS(state, data) {
-        state.LiveRtmpStatus = data;
+        state.liveRtmpStatus = data;
     }
 }
 export default {
