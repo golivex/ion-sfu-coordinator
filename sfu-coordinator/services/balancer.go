@@ -21,11 +21,17 @@ const MAX_PUBLISH_TRACK_THRESH = 9999 //if more than X tracks cannot publish any
 const MAX_CPULOAD_PER_HOST = 80       // if more than X cpu load, cannot connect to the host at all until load goes down, also load goes down over a period of time
 const MAX_PUBLISH_CPULOAD_THRESH = 70 // if more than X cpu, cannot publish can only subscribe
 
+type sessionStat struct {
+	PeerCount   int
+	AudioTracks int
+	VideoTracks int
+}
 type HostReply struct {
 	Host    string
 	Status  string
 	Session string
 	Publish bool
+	Stats   sessionStat
 }
 
 const NO_HOSTS_RETRY = "NO_HOSTS_RETRY"
@@ -194,10 +200,12 @@ func (e *etcdCoordinator) FindHost(session string, capacity int, role string) Ho
 			}
 		} else {
 			e.SpikeHost(host, role)
+			stats := e.getSessionStats(host, session)
 			return HostReply{
 				Host:    host.String(),
 				Status:  status,
 				Publish: canPublish,
+				Stats:   stats,
 			}
 		}
 	} else {
@@ -230,6 +238,23 @@ func (e *etcdCoordinator) FindHost(session string, capacity int, role string) Ho
 		}
 
 	}
+}
+
+func (e *etcdCoordinator) getSessionStats(host *Host, session string) sessionStat {
+	for key, _ := range e.sessions {
+		if e.sessions[key].Name == session {
+			sessionhost := e.sessions[key].Host
+			sessionport := e.sessions[key].Port
+			if host.Ip == sessionhost && host.Port == sessionport {
+				return sessionStat{
+					PeerCount:   e.sessions[key].PeerCount,
+					AudioTracks: e.sessions[key].AudioTracks,
+					VideoTracks: e.sessions[key].VideoTracks,
+				}
+			}
+		}
+	}
+	return sessionStat{}
 }
 
 func (e *etcdCoordinator) canHostServe(host *Host, role string) (canServe bool, canPublish bool) {
