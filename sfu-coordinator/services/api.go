@@ -23,6 +23,7 @@ func (e *etcdCoordinator) InitApi() {
 			"actionhosts": e.actionhosts,
 		})
 	})
+
 	r.GET("/session/:id", func(c *gin.Context) {
 		id := c.Param("id") //session name
 		if id == "" {
@@ -44,6 +45,19 @@ func (e *etcdCoordinator) InitApi() {
 
 		host := e.FindHost(id, cap, role)
 		c.JSON(200, host)
+	})
+	r.GET("/action/status/:session/:action", func(c *gin.Context) {
+		host, ac := e.queryActionStatus(c.Param("session"), c.Param("action"))
+		if host != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"host":         host.String(),
+				"actionstatus": ac,
+			})
+		} else {
+			c.JSON(http.StatusOK, gin.H{
+				"Response": "",
+			})
+		}
 	})
 	r.GET("/load/stats/:host/:port", func(c *gin.Context) {
 		hosts := e.statsLoad(c.Param("host"), c.Param("port"))

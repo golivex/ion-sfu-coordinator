@@ -14,6 +14,17 @@ type ActionStatus struct {
 	Session    string `json:"session"`
 	Err        error  `json:"err"`
 	ActionType string `json:"tasktype"`
+	Progress   string `json:"progress"`
+}
+
+func (e *etcdCoordinator) queryActionStatus(session string, action string) (*Host, *ActionStatus) {
+	for _, host := range e.actionhosts {
+		actionstatus := e.getActionStatus(host.Ip, host.Port)
+		if actionstatus.IsActive && actionstatus.Session == session && actionstatus.ActionType == action {
+			return &host, actionstatus
+		}
+	}
+	return nil, nil
 }
 
 func (e *etcdCoordinator) getActionStatus(host string, port string) *ActionStatus {
