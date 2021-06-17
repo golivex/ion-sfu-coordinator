@@ -51,7 +51,7 @@ func (n *node) getCloudMachine(h *Hub) *machine {
 func (h *Hub) checkIdleNodes() {
 	h.Lock()
 	defer h.Unlock()
-	log.Infof("checking idle nodes %v", len(h.nodes))
+	// log.Infof("checking idle nodes %v", len(h.nodes))
 	for idx, n := range h.nodes {
 		if n.isIdle {
 
@@ -80,14 +80,14 @@ func (h *Hub) checkIdleNodes() {
 					}
 
 				} else {
-					log.Infof("all nodes on this ip are not idle so cannot delete this server %v", n.Ip)
+					// log.Infof("all nodes on this ip are not idle so cannot delete this server %v", n.Ip)
 				}
 			}
 
 		}
 
 		if n.PeerCount == 0 {
-			log.Infof("node is idle %v %v", n.Ip, n.Port)
+			// log.Infof("node is idle %v %v", n.Ip, n.Port)
 			if !n.isIdle {
 				n.lastIdleCheckTime = time.Now()
 			}

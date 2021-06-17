@@ -13,8 +13,8 @@ import (
 	log "github.com/pion/ion-log"
 )
 
-const DEFAULT_MACHINE_SERIES = "n2"
-const DEFAULT_MACHINE_TYPE = DEFAULT_MACHINE_SERIES + "-standard-2"
+const DEFAULT_MACHINE_SERIES = "n1"
+const DEFAULT_MACHINE_TYPE = DEFAULT_MACHINE_SERIES + "-standard-1"
 
 func getZone() []string {
 	return []string{"asia-south1-a", "asia-south1-b", "asia-south1-c", "asia-east1-a", "asia-east1-b", "asia-east1-c", "us-central1-a", "us-central1-b"}
@@ -149,10 +149,10 @@ func StartInstance(capacity int, zoneidx int, isaction bool, prefix string) (mac
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	err := cmd.Run()
-	log.Infof("stdout.String(), stderr.String()", stdout.String(), stderr.String())
 	output := stdout
 
 	if err != nil {
+		log.Infof("stdout.String(), stderr.String()", stdout.String(), stderr.String())
 		log.Errorf("StartServer %v %v", err, output)
 		return StartInstance(capacity, zoneidx+1, isaction, prefix)
 	}
