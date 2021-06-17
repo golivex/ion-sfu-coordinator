@@ -46,6 +46,18 @@ func (e *etcdCoordinator) InitApi() {
 		host := e.FindHost(id, cap, role)
 		c.JSON(200, host)
 	})
+	r.GET("/action/status/", func(c *gin.Context) {
+		stats := e.queryActionStatusAllHosts()
+		c.JSON(http.StatusOK, gin.H{
+			"response": stats,
+		})
+	})
+	r.GET("/action/status/:session", func(c *gin.Context) {
+		stats := e.queryActionStatusForSession(c.Param("session"))
+		c.JSON(http.StatusOK, gin.H{
+			"response": stats,
+		})
+	})
 	r.GET("/action/status/:session/:action", func(c *gin.Context) {
 		host, ac := e.queryActionStatus(c.Param("session"), c.Param("action"))
 		if host != nil {
@@ -146,8 +158,13 @@ func (e *etcdCoordinator) InitApi() {
 		c.String(http.StatusOK, resp)
 	})
 	r.GET("/stopstream/:session", func(c *gin.Context) {
-		resp := e.stopStream(c.Param("session"))
-		c.String(http.StatusOK, resp)
+		if len(c.Query("host")) > 0 {
+			resp := e.stopStreamOnHost(c.Param("session"), c.Query("host"))
+			c.String(http.StatusOK, resp)
+		} else {
+			resp := e.stopStream(c.Param("session"))
+			c.String(http.StatusOK, resp)
+		}
 	})
 
 	r.GET("/rtmp/:session", func(c *gin.Context) {

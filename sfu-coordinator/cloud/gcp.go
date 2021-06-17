@@ -1,6 +1,7 @@
 package cloud
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"os/exec"
@@ -13,7 +14,7 @@ import (
 )
 
 const DEFAULT_MACHINE_SERIES = "n2"
-const DEFAULT_MACHINE_TYPE = DEFAULT_MACHINE_SERIES + "-standard-1"
+const DEFAULT_MACHINE_TYPE = DEFAULT_MACHINE_SERIES + "-standard-2"
 
 func getZone() []string {
 	return []string{"asia-south1-a", "asia-south1-b", "asia-south1-c", "asia-east1-a", "asia-east1-b", "asia-east1-c", "us-central1-a", "us-central1-b"}
@@ -127,7 +128,8 @@ func StartInstance(capacity int, zoneidx int, isaction bool, prefix string) (mac
 		tag = "action"
 		imagename = "actions-minimal-image"
 	}
-	output, err := exec.Command(
+	// output, err := exec.Command(
+	cmd := exec.Command(
 		"gcloud", "compute", "instances", "create", name,
 		"--zone="+zone,
 		"--machine-type="+machine_type,
@@ -139,24 +141,25 @@ func StartInstance(capacity int, zoneidx int, isaction bool, prefix string) (mac
 		"--boot-disk-type=pd-ssd",
 		"--metadata-from-file", startupscript,
 		// "--metadata-from-file", "startup-script=./cloud/scripts/sfu-base-startup.sh",
-		"--create-disk", "size=100GB,type=pd-ssd,auto-delete=yes", "--format=json").Output() //--scopes=logging-write,compute-rw,cloud-platform
+		"--create-disk", "size=100GB,type=pd-ssd,auto-delete=yes", "--format=json")
+	// .Output() //--scopes=logging-write,compute-rw,cloud-platform
 
-	// var stdout bytes.Buffer
-	// var stderr bytes.Buffer
-	// cmd.Stdout = &stdout
-	// cmd.Stderr = &stderr
-	// err := cmd.Run()
-	// log.Infof("stdout.String(), stderr.String()", stdout.String(), stderr.String())
-	// output := []byte("")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	log.Infof("stdout.String(), stderr.String()", stdout.String(), stderr.String())
+	output := stdout
 
 	if err != nil {
-		log.Errorf("StartServer %v", err)
+		log.Errorf("StartServer %v %v", err, output)
 		return StartInstance(capacity, zoneidx+1, isaction, prefix)
 	}
-	// log.Debugf("output %v", string(output))
+	// log.Debugf("output %v", output.String())
 
 	var machines []machine
-	json.Unmarshal(output, &machines)
+	json.Unmarshal(output.Bytes(), &machines)
 	return machines[0], nil
 }
 

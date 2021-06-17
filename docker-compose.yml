@@ -10,9 +10,9 @@ services:
         # ports:
         #     - 2379:2379
 
-    server:
+    coordinator:
         image: xtechsample/server
-        container_name: server
+        container_name: coordinator
         build:
             context : ./sfu-coordinator
         image: xtechsample/server-ion:latest

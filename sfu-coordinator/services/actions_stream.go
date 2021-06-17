@@ -64,3 +64,7 @@ func (e *etcdCoordinator) startStreamOnHost(session, rtmp, host, port string, re
 func (e *etcdCoordinator) stopStream(session string) string {
 	return e.stopAction(session, "tracktortp")
 }
+
+func (e *etcdCoordinator) stopStreamOnHost(session string, host string) string {
+	return e.stopActionOnHost(session, host, "tracktortp")
+}

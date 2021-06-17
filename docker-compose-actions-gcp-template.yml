@@ -5,8 +5,13 @@ services:
     actions:
         image: xtechsample/actions
         container_name: actions
-        command: ["-port", ":3050" , "-ipaddr" , "{ip}" , "-eaddr", "5.9.18.28:2379", "-saddr","http://5.9.18.28:4000/"]
+        command: ["server","--port", ":3050" ,"--ipaddr" , "{ip}" , "--eaddr", "5.9.18.28:2379", "--saddr","http://5.9.18.28:4000/"]
         restart: always
         network_mode: host
 
-    
+    rtmp:
+        image: gwuhaolin/livego
+        command : "--config_file /etc/livego.yaml"
+        volumes:
+            - ./cfgs/rtmp/livego.yaml:/etc/livego.yaml
+        network_mode: host
