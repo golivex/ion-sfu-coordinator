@@ -1,5 +1,5 @@
 <template>
-  <v-container class="grey lighten-5">
+  <v-container class="grey lighten-5 dashboard">
     <!-- TOP BUTTONS ROW -->
     <v-row>
       <v-col class="text-right">
@@ -154,8 +154,8 @@
           </div>
 
           <div v-if="host.sessions && host.sessions.length">
-            <div class="caption">Session</div>
-            <ul class="d-flex flex-wrap" style="gap: 2rem">
+            <div class="caption">Session ({{ host.sessions.length }})</div>
+            <ul class="d-flex flex-wrap session-list" style="gap: 2rem">
               <li v-for="(session, index) in host.sessions" :key="index">
                 <div class="subtitle">Name: {{ session.Name }}</div>
                 <div class="subtitle">PeerCount: {{ session.PeerCount }}</div>
@@ -289,8 +289,8 @@ export default {
           let h = this.getStats.hosts[key];
           const { ip, port } = this.getStats.hosts[key];
 
+          let sessions = [];
           for (const sessionkey in this.sessions) {
-            let sessions = [];
             if (Object.hasOwnProperty.call(this.sessions, sessionkey)) {
               let { Host, Port } = this.sessions[sessionkey];
 
@@ -484,3 +484,12 @@ export default {
   },
 };
 </script>
+
+<style lang="scss">
+.dashboard {
+  .session-list {
+    max-height: 250px;
+    overflow-y: auto;
+  }
+}
+</style>
