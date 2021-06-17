@@ -180,7 +180,7 @@ func (h *Hub) syncCloudMachines() {
 func (h *Hub) checkDeadMachines() {
 	h.Lock()
 	defer h.Unlock()
-	log.Infof("checking dead machines %v", len(h.machines))
+	// log.Infof("checking dead machines %v", len(h.machines))
 	for id, m := range h.machines {
 
 		found := false
@@ -201,16 +201,16 @@ func (h *Hub) checkDeadMachines() {
 		}
 
 		if !found {
-			log.Infof("dead machine %v", m.getIP())
+			// log.Infof("dead machine %v", m.getIP())
 			p, ok := h.machinePingMap[id]
 			if !ok {
-				log.Infof("adding ping %v", id)
+				// log.Infof("adding ping %v", id)
 				h.machinePingMap[id] = ping{
 					isDead:          true,
 					lastIsDeadCheck: time.Now(),
 				}
 			} else {
-				log.Infof("updating from last poing %v", p)
+				// log.Infof("updating from last poing %v", p)
 				if time.Since(m.CreationTimestamp) > (2 * 60 * time.Second) {
 					if time.Since(p.lastIsDeadCheck) > (WAIT_TIMEOUT_DELETE_CLOUD_DEAD * time.Second) {
 						log.Infof("delete this cloud machine as its dead %v", m.getIP())
@@ -295,7 +295,9 @@ func (h *Hub) DeleteNode(ip string, port string) {
 }
 
 func (hub *Hub) UpdateActionNodeLoad(ip string, port string, tasks int, cpu float64) {
+	//beware here that first ping comes from the base image ip which is wrong ip for some reason. unable to find reason for it
 	// log.Infof("updating action node load ip%v port%v tasks %v cpu %v", ip, port, tasks, cpu)
+	// log.Infof("action load %v", hub.lastMachineStarted)
 	if len(hub.lastMachineStarted) > 0 {
 		online, ok := hub.lastMachineStarted[ip]
 		if ok {

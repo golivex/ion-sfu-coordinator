@@ -70,6 +70,7 @@ func (e *etcdCoordinator) getActionStatus(host string, port string) *ActionStatu
 		log.Errorf("%v", err)
 		return nil
 	} else {
+		log.Infof("action host is working")
 		var response ActionStatus
 		err = json.Unmarshal(body, &response)
 		return &response
