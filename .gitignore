@@ -21,3 +21,4 @@ bin/
 bin/*
 .vscode
 .vscode/*
+cfgs/gcloud/*
