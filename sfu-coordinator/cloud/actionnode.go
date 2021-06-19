@@ -6,8 +6,8 @@ import (
 	log "github.com/pion/ion-log"
 )
 
-const IDLE_TIMEOUT_ACTIONS_CLOUD_HOST = 60 * 2
-const MAX_CLOUD_ACTION_MACHINES = 1 //10
+const IDLE_TIMEOUT_ACTIONS_CLOUD_HOST = 60
+const MAX_CLOUD_ACTION_MACHINES = 2 //10
 
 type actionnode struct {
 	Ip                string
@@ -46,6 +46,7 @@ func (n *actionnode) checkAllNodeIdle(h *Hub) bool {
 }
 
 func (n *actionnode) getCloudMachine(h *Hub) *machine {
+	log.Infof("get cloud machines %v", len(h.machines))
 	for _, m := range h.machines {
 		log.Infof("checking for cloud machine from node m.getIp %v node.Ip%v", m.getIP(), n.Ip)
 		if m.getIP() == n.Ip {
@@ -87,18 +88,21 @@ func (h *Hub) checkIdleActionNodes() {
 				} else {
 					log.Infof("all nodes on this ip are not idle so cannot delete this server %v", n.Ip)
 				}
+			} else {
+				log.Infof("action idle node is less than %v out of %v", time.Since(n.lastIdleCheckTime), IDLE_TIMEOUT_ACTIONS_CLOUD_HOST)
 			}
 
-		}
-
-		if n.Tasks == 0 {
-			log.Infof("action node is idle %v %v tasks %v", n.Ip, n.Port, n.Tasks)
-			if !n.isIdle {
-				n.lastIdleCheckTime = time.Now()
-			}
-			n.isIdle = true
 		} else {
-			n.isIdle = false
+
+			if n.Tasks == 0 {
+				log.Infof("action node is idle %v %v tasks %v", n.Ip, n.Port, n.Tasks)
+				if !n.isIdle {
+					n.lastIdleCheckTime = time.Now()
+				}
+				n.isIdle = true
+			} else {
+				n.isIdle = false
+			}
 		}
 		h.actionnodes[idx] = n
 	}

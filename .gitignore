@@ -21,4 +21,5 @@ bin/
 bin/*
 .vscode
 .vscode/*
-# cfgs/gcloud/*
+cfgs/gcloud/*
+sfu-coordinator/steady-datum-291915-386b3c696fb0.json

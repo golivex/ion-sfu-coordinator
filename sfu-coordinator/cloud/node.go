@@ -80,20 +80,21 @@ func (h *Hub) checkIdleNodes() {
 					}
 
 				} else {
-					// log.Infof("all nodes on this ip are not idle so cannot delete this server %v", n.Ip)
+					log.Infof("all nodes on this ip are not idle so cannot delete this server %v", n.Ip)
 				}
 			}
 
-		}
-
-		if n.PeerCount == 0 {
-			// log.Infof("node is idle %v %v", n.Ip, n.Port)
-			if !n.isIdle {
-				n.lastIdleCheckTime = time.Now()
-			}
-			n.isIdle = true
 		} else {
-			n.isIdle = false
+
+			if n.PeerCount == 0 {
+				// log.Infof("node is idle %v %v", n.Ip, n.Port)
+				if !n.isIdle {
+					n.lastIdleCheckTime = time.Now()
+				}
+				n.isIdle = true
+			} else {
+				n.isIdle = false
+			}
 		}
 		h.nodes[idx] = n
 	}

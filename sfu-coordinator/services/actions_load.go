@@ -17,7 +17,7 @@ func (e *etcdCoordinator) simLoad(session string, clients int, role string, cycl
 	// if i am doing sub only then load is 25% for 20sub, but current there is a default publisher also so 20 subs and 1pub
 
 	no_of_machines_start := 1
-	max_client_per_host := 40 //start 2 vcpu by default
+	max_client_per_host := 20 //start 2 vcpu by default if n2, if n1 machine it should be 20
 
 	if role == "sub" {
 		max_client_per_host = 200
@@ -26,8 +26,8 @@ func (e *etcdCoordinator) simLoad(session string, clients int, role string, cycl
 		no_of_machines_start = int(math.Ceil(float64(clients) / float64(max_client_per_host)))
 	}
 	capacity := clients //start server with capacity for all nodes based on role balance will automatically start the proper instance
-	if no_of_machines_start >= e.cloud.GetMaxActionMachines() {
-		return fmt.Sprintf("MORE THAN %v NOT SUPPORTED AS OF NOW", e.cloud.GetMaxActionMachines())
+	if (no_of_machines_start - len(e.actionhosts)) > (e.cloud.GetMaxActionMachines()) {
+		return fmt.Sprintf("CANNOT START MORE THAN %v SERVERS AS OF NOW AND No of Machines to start %v  Action hosts aviable %v", e.cloud.GetMaxActionMachines(), no_of_machines_start, len(e.actionhosts))
 	}
 	clients_per_host := int(math.Ceil(float64(clients) / float64(max_client_per_host)))
 	usedActions := make(map[string]int)
@@ -79,7 +79,6 @@ func (e *etcdCoordinator) simLoadForHost(session string, host string, port strin
 		if retry > 1 {
 			time.Sleep(5) //it takes time for host to get ready
 			return e.simLoadForHost(session, host, port, clients, role, cycle, rooms, file, retry-1, capacity)
-
 		}
 		return fmt.Sprintf("Err %v", err)
 	}
