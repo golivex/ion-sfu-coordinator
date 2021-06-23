@@ -177,67 +177,20 @@ func (e *etcdCoordinator) InitApi() {
 		c.String(http.StatusOK, resp)
 	})
 
-	// r.GET("/load/:session/:host/:port", func(c *gin.Context) {
-	// 	clients := c.Query("clients")
-	// 	no := 1
-	// 	if clients != "" {
-	// 		x, err := strconv.Atoi(clients)
-	// 		if err == nil {
-	// 			log.Errorf("error string to int ", err)
-	// 		} else {
-	// 			no = x
-	// 		}
-	// 	}
-	// 	role := c.Query("role")
-	// 	if len(role) == 0 || role == "pubsub" {
-	// 		role = "pubsub"
-	// 	} else {
-	// 		role = "sub"
-	// 	}
+	r.GET("/mirror/:session/:session2", func(c *gin.Context) {
+		resp := e.mirrorSfu(c.Param("session"), c.Param("session2"))
+		c.String(http.StatusOK, resp)
+	})
+	r.GET("/stopmirror/:session", func(c *gin.Context) {
+		if len(c.Query("host")) > 0 {
+			resp := e.stopMirrorOnHost(c.Param("session"), c.Query("host"))
+			c.String(http.StatusOK, resp)
+		} else {
+			resp := e.stopMirror(c.Param("session"))
+			c.String(http.StatusOK, resp)
+		}
+	})
 
-	// 	qcycle := c.Query("cycle")
-	// 	cycle := 0
-	// 	if len(qcycle) != 0 {
-	// 		x, err := strconv.Atoi(qcycle)
-	// 		if err == nil {
-	// 			cycle = x
-	// 		}
-	// 	}
-	// 	qrooms := c.Query("rooms")
-	// 	rooms := -1
-	// 	if len(qrooms) != 0 {
-	// 		x, err := strconv.Atoi(qrooms)
-	// 		if err == nil {
-	// 			rooms = x
-	// 		}
-	// 	}
-
-	// 	file := c.Query("file")
-	// 	if len(file) == 0 {
-	// 		file = "default"
-	// 	} else {
-	// 		file = c.Query("file")
-	// 	}
-
-	// 	go e.simLoadForHost(c.Param("session"), c.Param("host"), c.Param("port"), no, role, cycle, rooms, file, 1, -1)
-	// 	c.Status(http.StatusOK)
-	// })
-	// /session/test/node/5.9.18.28:7002/peer/ckoy35usg00080110qpo13b3v
-	// r.GET("/clearsession", func(c *gin.Context) {
-	// 	e.cli.Delete(context.Background(), "/session/", clientv3.WithPrefix())
-	// })
-	// r.GET("/simulate/session/:id/:host/:port", func(c *gin.Context) {
-	// 	kvc := clientv3.NewKV(e.cli)
-	// 	peerid := fmt.Sprintf("%v", rand.Intn(1000000000000000))
-	// 	id := c.Param("id")
-	// 	host := c.Param("host")
-	// 	port := c.Param("port")
-	// 	session := "/session/" + id + "/node/" + host + ":" + port + "/peer/" + peerid + "/track/" + peerid + "/"
-	// 	kvc.Put(context.Background(), "/session/"+id+"/node/"+host+":"+port, "")
-	// 	kvc.Put(context.Background(), session+"/video", "")
-	// 	kvc.Put(context.Background(), session+"/audio", "")
-	// 	c.String(200, session)
-	// })
 	log.Infof("Starting api server")
 	r.Run(":4000")
 }

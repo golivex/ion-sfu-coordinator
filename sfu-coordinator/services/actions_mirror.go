@@ -1,42 +1,41 @@
 package coordinator
 
 import (
+	"fmt"
 	"net/http"
-	"sync"
 	"time"
 
 	log "github.com/pion/ion-log"
 )
 
 var mirrorChecker = map[string]time.Time{}
-var checkmu sync.Mutex
 
 const MIRROR_RETRY_WAIT = 15
 
-//TODO check if this is even working the service at port 3050
-func MirrorSfu(session, session2 string, host Host, nhost Host) {
-	checkmu.Lock()
-	defer checkmu.Unlock()
+//mirror will work different than other actions
+//because we need to not just start action to fwd but we need a sfu also
+// so this will start a server with both sfu and actions
+//so this is only testing as of now with an existing host
 
-	key := host.String() + ":" + session + ":" + session2
-	_, ok := mirrorChecker[key]
-	if ok {
-		if time.Now().Sub(mirrorChecker[key]) > (MIRROR_RETRY_WAIT * time.Second) {
-			delete(mirrorChecker, key)
-		} else {
-			log.Infof("skipping mirror as operation called recently!")
-			return
-		}
+func (e *etcdCoordinator) mirrorSfu(session, session2 string) string {
+	actionhost := e.getReadyActionHost()
+	if actionhost == nil {
+		return "No ready action host"
 	}
 
-	apiurl := "http://" + host.Ip + ":" + host.Port + "/mirror/syncsfu/" + session + "/" + session2 + "/" + host.String() + "/" + nhost.String()
+	apiurl := "http://" + actionhost.Ip + ":" + actionhost.Port + "/mirror/sync/" + session + "/" + session2
 	log.Infof("api called %v", apiurl)
-	resp, err := http.Get(apiurl)
+	_, err := http.Get(apiurl)
 	if err != nil {
-		log.Errorf("%v", err)
-		panic(err)
-	} else {
-		mirrorChecker[key] = time.Now()
-		log.Infof("mirror sfu %v", resp.StatusCode)
+		return fmt.Sprintf("%v", err)
 	}
+	return "Started"
+}
+
+func (e *etcdCoordinator) stopMirror(session string) string {
+	return e.stopAction(session, "mirrorsfu")
+}
+
+func (e *etcdCoordinator) stopMirrorOnHost(session string, host string) string {
+	return e.stopActionOnHost(session, host, "mirrorsfu")
 }

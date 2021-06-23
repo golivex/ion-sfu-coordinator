@@ -7,7 +7,7 @@ import (
 )
 
 const IDLE_TIMEOUT_ACTIONS_CLOUD_HOST = 60
-const MAX_CLOUD_ACTION_MACHINES = 2 //10
+const MAX_CLOUD_ACTION_MACHINES = 0 //10
 
 type actionnode struct {
 	Ip                string
