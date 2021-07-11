@@ -50,7 +50,7 @@ func (e *etcdCoordinator) getActionHostByIp(ip string) *Host {
 
 func (e *etcdCoordinator) startActionHost(capacity int, atype string) chan string {
 	notifyip := make(chan string, 1)
-	log.Infof("startActionHost %v", capacity)
+	log.Infof("startActionHost capacity %v", capacity)
 	// go func() {
 	log.Infof("starting action machine with capacity %v", capacity)
 	if e.cloud.StartActionServerNotify(capacity, atype, notifyip) {
@@ -59,6 +59,7 @@ func (e *etcdCoordinator) startActionHost(capacity int, atype string) chan strin
 		log.Infof("unable to start action machine")
 	}
 	// }()
+
 	return notifyip
 }
 
