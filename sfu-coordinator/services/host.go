@@ -19,6 +19,7 @@ type capacity struct {
 type Host struct {
 	Ip              string  `json:"ip"`
 	Port            string  `json:"port"`
+	Domain          string  `json:"domain"`
 	Tasks           int     `json:"tasks"`
 	PeerCount       int     `json:"peer"`
 	AudioTracks     int     `json:"audio"`
@@ -79,11 +80,12 @@ func (h *Host) GetCurrentLoad() float64 {
 }
 
 type HostPing struct {
-	Ip    string  `json:"ip"`
-	Port  string  `json:"port"`
-	Cpu   float64 `json:"cpu"`
-	Mem   float64 `json:"mem"`
-	Tasks int     `json:"tasks"`
+	Ip     string  `json:"ip"`
+	Port   string  `json:"port"`
+	Domain string  `json:"domain"`
+	Cpu    float64 `json:"cpu"`
+	Mem    float64 `json:"mem"`
+	Tasks  int     `json:"tasks"`
 }
 
 func (e *etcdCoordinator) addHost(key string, loadStr []byte, isaction bool) {
@@ -119,6 +121,7 @@ func (e *etcdCoordinator) addHost(key string, loadStr []byte, isaction bool) {
 			Ip:              hostping.Ip,
 			Port:            hostping.Port,
 			Tasks:           hostping.Tasks,
+			Domain:          hostping.Domain,
 			Loads:           []Load{},
 			Spike:           []Spike{},
 			BlockedCapacity: make(map[string]capacity),

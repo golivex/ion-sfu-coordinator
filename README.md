@@ -102,10 +102,9 @@ so 500 * 4 = 2k users can be handled on dev server itself
 export GO111MODULE=on
 
 
-go run cmd/signal/allrpc/main.go -c ./../cfgs/sfuA.toml -jaddr :7002 -gaddr :50052 -eaddr 0.0.0.0:2379 -ipaddr 5.9.18.28
+go run cmd/signal/allrpc/main.go -c ./../cfgs/sfuA.toml -jaddr :7002 -gaddr :50052 -eaddr 0.0.0.0:2379 -domain https://sfu-host.platoo.in
 
 
 Caddy
 =======
-
 Provide the cloudflare token to edit DNS zones and not global api key

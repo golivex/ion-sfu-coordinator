@@ -4,7 +4,7 @@ services:
 
     sfu:
         image: xtechsample/ion-sfu:latest-allrpc
-        command: ["-c", "/configs/sfu.toml", "-jaddr", ":7001" , "-gaddr" , ":50051" , "-eaddr", "5.9.18.28:2379", "-ipaddr", "{ip}"]
+        command: ["-c", "/configs/sfu.toml", "-jaddr", ":7001" , "-gaddr" , ":50051" , "-eaddr", "176.9.137.77:2379"]
         volumes:
             - "./cfgs/sfu-gcp.toml:/configs/sfu.toml"
         network_mode: host

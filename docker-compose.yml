@@ -21,8 +21,8 @@ services:
         depends_on:
             - etcd
 
-    coordinator_cadday:
-        container_name: coordinator_cadday
+    coordinator_proxy:
+        container_name: coordinator_proxy
         build:
             context: ./caddy
         restart: unless-stopped
@@ -53,7 +53,7 @@ services:
         build: 
             context: ./ion-sfu
             dockerfile: cmd/signal/allrpc/Dockerfile
-        command: ["-c", "/configs/sfu.toml", "-jaddr", ":7002", "-gaddr" , ":50052", "-eaddr", "0.0.0.0:2379", "-ipaddr", "5.9.18.28"]
+        command: ["-c", "/configs/sfu.toml", "-jaddr", ":7002", "-gaddr" , ":50052", "-eaddr", "0.0.0.0:2379","-domain","https://sfu-host.platoo.in"] # "-ipaddr", "5.9.18.28" ipaddr sfu is able to find dynamically now 
         volumes:
             - "./cfgs/sfuA.toml:/configs/sfu.toml"
         network_mode: host
@@ -63,14 +63,13 @@ services:
         #     - "10000-11000:10000-11000/udp"
         #     - 7001:7001
             
-    
 
     # sfuB:
     #     image: xtechsample/ion-sfu:latest-allrpc
     #     build: 
     #         context: ./ion-sfu
     #         dockerfile: cmd/signal/allrpc/Dockerfile
-    #     command: ["-c", "/configs/sfu.toml", "-jaddr", ":7003", "-gaddr" , ":50053", "-eaddr", "0.0.0.0:2379", "-ipaddr", "5.9.18.28", "-maddr", ":8102"]
+    #     command: ["-c", "/configs/sfu.toml", "-jaddr", ":7003", "-gaddr" , ":50053", "-eaddr", "0.0.0.0:2379"]
     #     volumes:
     #         - "./cfgs/sfuB.toml:/configs/sfu.toml"
     #     network_mode: host

@@ -28,6 +28,7 @@ type sessionStat struct {
 }
 type HostReply struct {
 	Host    string
+	Domain  string
 	Status  string
 	Session string
 	Publish bool
@@ -203,6 +204,7 @@ func (e *etcdCoordinator) FindHost(session string, capacity int, role string) Ho
 			stats := e.getSessionStats(host, session)
 			return HostReply{
 				Host:    host.String(),
+				Domain:  host.Domain,
 				Status:  status,
 				Publish: canPublish,
 				Stats:   stats,
