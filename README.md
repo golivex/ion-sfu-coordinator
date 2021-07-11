@@ -103,3 +103,9 @@ export GO111MODULE=on
 
 
 go run cmd/signal/allrpc/main.go -c ./../cfgs/sfuA.toml -jaddr :7002 -gaddr :50052 -eaddr 0.0.0.0:2379 -ipaddr 5.9.18.28
+
+
+Caddy
+=======
+
+Provide the cloudflare token to edit DNS zones and not global api key

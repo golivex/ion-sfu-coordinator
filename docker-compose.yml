@@ -21,6 +21,21 @@ services:
         depends_on:
             - etcd
 
+    coordinator_cadday:
+        container_name: coordinator_cadday
+        build:
+            context: ./caddy
+        restart: unless-stopped
+        # ports:
+        # - "81:81"
+        # - "444:444"
+        network_mode: host
+        env_file: .env
+        volumes:
+        - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+        - caddy_data:/data
+        - caddy_config:/config
+
     admin:
         image: xtechsample/admin
         container_name: admin
@@ -48,6 +63,7 @@ services:
         #     - "10000-11000:10000-11000/udp"
         #     - 7001:7001
             
+    
 
     # sfuB:
     #     image: xtechsample/ion-sfu:latest-allrpc
@@ -127,3 +143,8 @@ services:
     #         - "445:443"
     #     volumes:
     #         - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+
+volumes:    
+    caddy_data:
+        external: true
+    caddy_config:
