@@ -13,7 +13,7 @@ cat my_password.txt | docker login --username exceltech --password-stdin
 IP=$(curl -H "Metadata-Flavor: Google" http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip)
 echo $IP
 
-name=${IP//[^[:alnum:]]/}
+name=$(echo $IP | sed -e 's/\.//g')
 
 rm -rf docker-compose-gcp.yml
 rm -rf ./cfgs/sfu-gcp.toml
