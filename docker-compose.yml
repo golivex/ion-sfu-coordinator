@@ -21,8 +21,9 @@ services:
         depends_on:
             - etcd
 
-    coordinator_proxy:
-        container_name: coordinator_proxy
+    proxy:
+        image: xtechsample/caddyproxy
+        container_name: proxy
         build:
             context: ./caddy
         restart: unless-stopped

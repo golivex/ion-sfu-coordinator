@@ -16,9 +16,12 @@ sfu-coordinator.platoo.in {
         resolvers 1.1.1.1
     }
 }
-
 sfu-host.platoo.in {
-    reverse_proxy 127.0.0.1:7002
+    @websockets {
+        header Connection *Upgrade*
+        header Upgrade websocket
+    }
+    reverse_proxy @websockets 127.0.0.1:7002
     tls {
         dns cloudflare {env.CLOUDFLARE_API_TOKEN}
         resolvers 1.1.1.1

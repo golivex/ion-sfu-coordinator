@@ -13,10 +13,13 @@ cat my_password.txt | docker login --username exceltech --password-stdin
 IP=$(curl -H "Metadata-Flavor: Google" http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip)
 echo $IP
 
+name=${IP//[^[:alnum:]]/}
+
 rm -rf docker-compose-gcp.yml
 rm -rf ./cfgs/sfu-gcp.toml
 sed "s/{ip}/$IP/g" docker-compose-gcp-template.yml >> docker-compose-gcp.yml
 sed "s/{ip}/$IP/g" ./cfgs/sfu-gcp.template.toml >> ./cfgs/sfu-gcp.toml
+sed "s/{name}/$name/g" ./caddy/Caddyfile.gcp.template.sfu >> ./caddy/Caddyfile.gcp.sfu
 
 sudo ulimit -c unlimited
 sudo ulimit -SHn 1000000

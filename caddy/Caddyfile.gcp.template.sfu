@@ -1,0 +1,7 @@
+{name}.platoo.in {
+    reverse_proxy 127.0.0.1:7001
+    tls {
+        dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+        resolvers 1.1.1.1
+    }
+}
