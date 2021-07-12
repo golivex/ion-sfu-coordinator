@@ -31,6 +31,8 @@ sudo sysctl -w net.core.somaxconn=65535
 sudo sysctl -w net.ipv4.tcp_max_syn_backlog=65535
 sudo sysctl -w net.ipv4.tcp_syncookies=1
 
+sudo ufw allow 443
+
 sudo docker-compose -f docker-compose-gcp.yml pull
 sudo docker-compose -f docker-compose-gcp.yml stop
 sudo docker-compose -f docker-compose-gcp.yml up -d 
