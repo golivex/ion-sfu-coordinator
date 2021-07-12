@@ -108,3 +108,10 @@ go run cmd/signal/allrpc/main.go -c ./../cfgs/sfuA.toml -jaddr :7002 -gaddr :500
 Caddy
 =======
 Provide the cloudflare token to edit DNS zones and not global api key
+
+Private Information
+======================
+.env
+
+gcp json
+

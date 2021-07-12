@@ -24,4 +24,3 @@ bin/*
 cfgs/gcloud/*
 sfu-coordinator/steady-datum-291915-386b3c696fb0.json
 caddy/.env
-my_password.txt
