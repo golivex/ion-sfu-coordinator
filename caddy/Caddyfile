@@ -1,33 +1,35 @@
 {
-	email blog@excellencetechnologies.in
+	email {env.CLOUDFLARE_EMAIL}
 	http_port 80
 	https_port 443
 	dynamic_dns {
-		provider cloudflare vPQZbuFEb61mmJ8w9TGVUWFY-Yb3aOidtrJIroBS
+		provider cloudflare {env.CLOUDFLARE_API_TOKEN}
+		ip_source simple_http https://icanhazip.com
+		ip_source simple_http https://api.ipify.org
 		domains {
-			platoo.in sfu-coordinator sfu-host
+			exweb.in sfu sfu-host
 		}
 	}
 }
-sfu-coordinator.platoo.in {
+sfu.exweb.in {
 	header {
 		Access-Control-Allow-Origin *
 		-Server
 	}
 	reverse_proxy 127.0.0.1:4000
 	tls {
-		dns cloudflare vPQZbuFEb61mmJ8w9TGVUWFY-Yb3aOidtrJIroBS
+		dns cloudflare {env.CLOUDFLARE_API_TOKEN}
 		resolvers 1.1.1.1
 	}
 }
-sfu-host.platoo.in {
+sfu-host.exweb.in {
 	@websockets {
 		header Connection *Upgrade*
 		header Upgrade websocket
 	}
 	reverse_proxy @websockets 127.0.0.1:7002
 	tls {
-		dns cloudflare vPQZbuFEb61mmJ8w9TGVUWFY-Yb3aOidtrJIroBS
+		dns cloudflare {env.CLOUDFLARE_API_TOKEN}
 		resolvers 1.1.1.1
 	}
 }
