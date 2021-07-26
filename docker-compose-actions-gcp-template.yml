@@ -5,7 +5,7 @@ services:
     actions:
         image: xtechsample/actions
         container_name: actions
-        command: ["server","--port", ":3050" ,"--ipaddr" , "{ip}" , "--eaddr", "176.9.137.77:2379", "--saddr","https://sfu-coordinator.platoo.in/"]
+        command: ["server","--port", ":3050" ,"--ipaddr" , "{ip}" , "--eaddr", "176.9.137.77:2379", "--saddr","https://sfu.excellencetechnologies.info/"]
         restart: always
         network_mode: host
 

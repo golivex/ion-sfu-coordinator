@@ -7,11 +7,11 @@
 		ip_source simple_http https://icanhazip.com
 		ip_source simple_http https://api.ipify.org
 		domains {
-			exweb.in sfu sfu-host
+			excellencetechnologies.info sfu sfu-host
 		}
 	}
 }
-sfu.exweb.in {
+sfu.excellencetechnologies.info {
 	header {
 		Access-Control-Allow-Origin *
 		-Server
@@ -22,7 +22,7 @@ sfu.exweb.in {
 		resolvers 1.1.1.1
 	}
 }
-sfu-host.exweb.in {
+sfu-host.excellencetechnologies.info {
 	@websockets {
 		header Connection *Upgrade*
 		header Upgrade websocket
