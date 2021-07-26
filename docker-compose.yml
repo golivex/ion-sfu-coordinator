@@ -54,7 +54,7 @@ services:
         build: 
             context: ./ion-sfu
             dockerfile: cmd/signal/allrpc/Dockerfile
-        command: ["-c", "/configs/sfu.toml", "-jaddr", ":7002", "-gaddr" , ":50052", "-eaddr", "0.0.0.0:2379","-domain","https://sfu-host.platoo.in"] # "-ipaddr", "5.9.18.28" ipaddr sfu is able to find dynamically now 
+        command: ["-c", "/configs/sfu.toml", "-jaddr", ":7002", "-gaddr" , ":50052", "-eaddr", "0.0.0.0:2379","-domain","https://sfu-host.excellencetechnologies.info"] # "-ipaddr", "5.9.18.28" ipaddr sfu is able to find dynamically now 
         volumes:
             - "./cfgs/sfuA.toml:/configs/sfu.toml"
         network_mode: host

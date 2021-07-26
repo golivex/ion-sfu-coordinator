@@ -15,8 +15,8 @@ var CAPABLITY = map[string]int{
 const IDLE_TIMEOUT_CLOUD_HOST = 60
 const WAIT_TIMEOUT_DELETE_CLOUD_DEAD = 15
 const MAX_MACHINE_LOAD = 70
-const MINIMUM_CLOUD_HOSTS = 1
-const MAX_CLOUD_HOSTS = 1
+const MINIMUM_CLOUD_HOSTS = 0
+const MAX_CLOUD_HOSTS = 0
 
 type ping struct {
 	isDead          bool
