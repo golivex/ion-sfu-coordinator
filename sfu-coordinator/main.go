@@ -14,7 +14,7 @@ func main() {
 
 	hub := cloud.RegisterHub(ctx)
 
-	etcd := coordinator.NewCoordinatorEtcd("0.0.0.0:2379")
+	etcd := coordinator.NewCoordinatorEtcd("176.9.137.77:2379")
 	defer etcd.Close()
 	go etcd.LoadSessions(ctx)
 	go etcd.LoadHosts(ctx)

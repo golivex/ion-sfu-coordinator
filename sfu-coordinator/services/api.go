@@ -166,7 +166,10 @@ func (e *etcdCoordinator) InitApi() {
 			c.String(http.StatusOK, resp)
 		}
 	})
-
+	r.GET("/rtmp/getkey", func(c *gin.Context) {
+		resp := e.getRtmpKey()
+		c.String(http.StatusOK, resp)
+	})
 	r.GET("/rtmp/:session", func(c *gin.Context) {
 		session := c.Param("session")
 		resp := e.startRtmp(session, c.Query("rtmp"))
