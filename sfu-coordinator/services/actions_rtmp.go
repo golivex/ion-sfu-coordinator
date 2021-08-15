@@ -10,7 +10,7 @@ import (
 	log "github.com/pion/ion-log"
 )
 
-func (e *etcdCoordinator) getRtmpKey() string {
+func (e *etcdCoordinator) getRtmpKey(room string) string {
 
 	usedActions := make(map[string]int)
 	actionhost := e.getReadyActionHost()
@@ -31,12 +31,12 @@ func (e *etcdCoordinator) getRtmpKey() string {
 			if actionhost == nil {
 				panic("host cannot be nil!")
 			}
-			e.getKeyOnHost(actionhost.Ip, actionhost.Port, 3)
+			e.getKeyOnHost(room, actionhost.Ip, actionhost.Port, 3)
 		}()
 	} else {
 		log.Infof("action host found %v", actionhost.String())
 		usedActions[actionhost.Ip] = 1
-		key := e.getKeyOnHost(actionhost.Ip, actionhost.Port, 3)
+		key := e.getKeyOnHost(room, actionhost.Ip, actionhost.Port, 3)
 		usedActions[key] = 1
 	}
 	b, _ := json.Marshal(usedActions)
@@ -80,15 +80,15 @@ func (e *etcdCoordinator) startRtmp(session string, rtmp string) string {
 	return string(b)
 }
 
-func (e *etcdCoordinator) getKeyOnHost(host, port string, retry int) string {
-	apiurl := "http://" + host + ":" + port + "/rtmp/getkey/zoom"
+func (e *etcdCoordinator) getKeyOnHost(room, host, port string, retry int) string {
+	apiurl := "http://" + host + ":" + port + "/rtmp/getkey/" + room
 	log.Infof("rtmp api called %v retry %v", apiurl, retry)
 	resp, err := http.Get(apiurl)
 	if err != nil {
 		log.Errorf("%v", err)
 		if retry > 1 {
 			time.Sleep(5) //it takes time for host to get ready
-			return e.getKeyOnHost(host, port, retry-1)
+			return e.getKeyOnHost(room, host, port, retry-1)
 		}
 		return fmt.Sprintf("Err %v", err)
 	}

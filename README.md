@@ -1,6 +1,6 @@
 # live_ion_cluster
 
-1) The idea here is that, will be using https://github.com/cryptagon/ion-cluster on google cloud instances which will auto scale via cloud instance load balancer
+1) The idea here is that, will be using https://github.com/pion/ion-sfu on google cloud instances which will auto scale via cloud instance load balancer
 
 2) Now the problem is that, when we add a new container, we would need to know the ip address of that container/number of sessions it has so that when a new call/conference
 is start the frontend is able to connect to the correct node
@@ -112,6 +112,5 @@ Provide the cloudflare token to edit DNS zones and not global api key
 Private Information
 ======================
 .env
-
 gcp json
 
