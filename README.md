@@ -114,3 +114,9 @@ Private Information
 .env
 gcp json
 
+
+
+License
+=========
+
+GPL License - see license.md for full text
